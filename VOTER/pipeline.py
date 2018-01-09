@@ -215,24 +215,18 @@ def run(argv=None):
                | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
 
         output = (
-            raw | "WriteRaw" >> beam.io.Write(
-                beam.io.BigQuerySink(
-                    table='VOTER.VoterFileRaw',
-                    validate=True,
-                    schema=RAW_VF_SCHEMA,
-                    write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
-                    create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED)))
-
-        output = (raw
+            raw | "WriteRaw" >> beam.io.WriteToBigQuery(
+                table='VOTER.VoterFileRaw',
+                schema=RAW_VF_SCHEMA,
+                write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+                create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
+        output = ( raw
             | "build_formatted" >> beam.Map(build_formatted, known_args.usps_key)
-            | "WriteFormatted" >> beam.io.Write(
-                beam.io.BigQuerySink(
-                    table='VOTER.Formatted',
-                    validate=True,
-                    schema=FORMATTED_SCHEMA,
-                    write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
-                    create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED)))
-
+            | "WriteFormatted" >> beam.io.WriteToBigQuery(
+                table='VOTER.Formatted',
+                schema=FORMATTED_SCHEMA,
+                write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+                create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
