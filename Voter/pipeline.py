@@ -90,7 +90,7 @@ def vf_standardize_address(row, usps_key):
             rpredirection,
             rstreetname,
             rpostdirection,
-            rapartment)
+            rapartment).replace("  ", " ")
     else:
         address = "{} {} {} {} {} APT {}".format(
             raddnumber,
@@ -98,7 +98,7 @@ def vf_standardize_address(row, usps_key):
             rpredirection,
             rstreetname,
             rpostdirection,
-            rapartment)
+            rapartment).replace("  ", " ")
     try:
         address = address.upper()
         # addr = {'address': address, 'city': row['RCITY'], 'state': 'NY'}
@@ -110,7 +110,7 @@ def vf_standardize_address(row, usps_key):
         #    result['state'],
         #    result['zip5'],
         #    zip4)
-        fmt_address = address
+        fmt_address = ", ".join(address, row['RCITY'], "NY {}".format(row['RZIP5']))
     except Exception:
         fmt_address = None
 
@@ -133,7 +133,7 @@ def vf_standardize_address(row, usps_key):
         #    result['state'],
         #    result['zip5'],
         #    zip4)
-        fmt_street = street
+        fmt_street = ", ".join(street, row['RCITY'], "NY {}".format(row['RZIP5']))
     except Exception:
         fmt_street = None
 
@@ -168,7 +168,7 @@ def build_formatted(element, usps_key):
     new = {RETAIN[k]: element[k] for k in RETAIN}
 
     # Name.
-    new['Name'] = "{} {} {} {}".format(
+    new['FullName'] = "{} {} {} {}".format(
         element['FIRSTNAME'], element['MIDDLENAME'],
         element['LASTNAME'], element['NAMESUFFIX']
         ).replace("  ", " ").title()
