@@ -14,9 +14,11 @@ from __future__ import absolute_import
 import argparse
 import logging
 import csv
+import threading
 
 from pyusps import address_information
 from datetime import date, datetime
+from collections import deque
 
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
@@ -38,8 +40,7 @@ RAW_VF_SCHEMA = (
     "VoterHistory:STRING,Phone:STRING")
 
 FORMATTED_SCHEMA = (
-    "LastName:STRING,FirstName:STRING,MiddleName:STRING,NameSuffix:STRING,"
-    "Gender:STRING,Enrollment:STRING,OtherPartyEnrollment:STRING,"
+    "FullName:STRING,Gender:STRING,Enrollment:STRING,OtherPartyEnrollment:STRING,"
     "ElectionDistrict:STRING,LegislativeDistrict:INTEGER,TownCityCode:STRING,"
     "Ward:STRING,CongressionalDistrict:INTEGER,SenateDistrict:INTEGER,"
     "AssemblyDistrict:INTEGER,PreviousName:STRING,CountyVoterNumber:STRING,"
@@ -136,15 +137,11 @@ def vf_standardize_address(row, usps_key):
     return fmt_address, fmt_street
 
 
-def build_formatted(element, usps_key):
+def build_formatted(element, usps_key, results):
     """Generate row in formatted table."""
 
     # Copy retained fields
-    RETAIN = {'LASTNAME': 'LastName',
-        'FIRSTNAME': 'FirstName',
-        'MIDDLENAME': 'MiddleName',
-        'NAMESUFFIX': 'NameSuffix',
-        'GENDER': 'Gender',
+    RETAIN = {'GENDER': 'Gender',
         'ENROLLMENT': 'Enrollment',
         'OTHERPARTY': 'OtherPartyEnrollment',
         'ED': 'ElectionDistrict',
@@ -164,6 +161,12 @@ def build_formatted(element, usps_key):
         'SBOEID': 'SBOEID',
         'VoterHistory': 'VoterHistory'}
     new = {RETAIN[k]: element[k] for k in RETAIN}
+
+    # Name.
+    new['Name'] = "{} {} {} {}".format(
+        element['FIRSTNAME'], element['MIDDLENAME'][0],
+        element['LASTNAME'], element['NAMESUFFIX']
+        ).replace("  ", " ").title()
 
     # Parse dates.  Must be returned as ISO string, not date object.
     DATES = {'DOB': 'DateOfBirth',
@@ -186,7 +189,30 @@ def build_formatted(element, usps_key):
     new['Address'] = fmt_address
     new['StreetAddress'] = fmt_street
 
-    return new
+    results.append(new)
+    return
+
+class BatchRunner(beam.DoFn):
+
+    def process(self, batch, usps_key):
+        threads = deque()
+        results = []
+        for row in batch:
+            if len(threads) > 50:
+                t = threads.popleft()
+                t.join()
+
+            t = threading.Thread(target=build_formatted,
+                    args=(row, usps_key, results))
+            t.start()
+            threads.append(t)
+
+        while threads:
+            t = threads.popleft()
+            t.join()
+
+        for r in results:
+            yield r
 
 def run(argv=None):
     """Main entry point; defines and runs the pipeline."""
@@ -211,19 +237,21 @@ def run(argv=None):
 
        # TODO: Select rather than hard-code bucket/file name
         raw = (p
-               | "beam.io.ReadFromText" >> beam.io.ReadFromText("gs://upload-raw/AllNYSVoters_2017-12-27.csv")
+               | "AllNYSVoters_2017-12-27.csv" >> beam.io.ReadFromText("gs://upload-raw/AllNYSVoters_2017-12-27.csv")
                | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
 
         output = (
-            raw | "WriteRaw" >> beam.io.WriteToBigQuery(
-                table='VOTER.VoterFileRaw',
+            raw | "Voter.Raw" >> beam.io.WriteToBigQuery(
+                table='Voter.Raw',
                 schema=RAW_VF_SCHEMA,
                 write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
+
         output = ( raw
-            | "build_formatted" >> beam.Map(build_formatted, known_args.usps_key)
-            | "WriteFormatted" >> beam.io.WriteToBigQuery(
-                table='VOTER.Formatted',
+            | "BatchElements" >> beam.BatchElements()
+            | "BatchRunner" >> beam.ParDo(BatchRunner(), known_args.usps_key)
+            | "Voter.Formatted" >> beam.io.WriteToBigQuery(
+                table='Voter.Formatted',
                 schema=FORMATTED_SCHEMA,
                 write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
