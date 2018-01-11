@@ -2,7 +2,7 @@
 
 A standardized data warehouse of New York political data, using [Google BigQuery](https://cloud.google.com/bigquery) and [Google Cloud Dataflow](https://cloud.google.com/dataflow).
 
-Principles are:
+Principles:
 * Free or minimal cost to use
 * Easy to query, join and analyze
 * Simple, repeatable pipelines to populate data

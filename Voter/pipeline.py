@@ -42,7 +42,7 @@ RAW_VF_SCHEMA = (
 
 FORMATTED_SCHEMA = (
     "FullName:STRING,Gender:STRING,Enrollment:STRING,OtherPartyEnrollment:STRING,"
-    "ElectionDistrict:STRING,LegislativeDistrict:INTEGER,TownCityCode:STRING,"
+    "ElectionDistrict:INTEGER,LegislativeDistrict:INTEGER,TownCityCode:STRING,"
     "Ward:STRING,CongressionalDistrict:INTEGER,SenateDistrict:INTEGER,"
     "AssemblyDistrict:INTEGER,PreviousName:STRING,CountyVoterNumber:STRING,"
     "VoterRegistrationSource:STRING,IDRequired:STRING,IDMet:STRING,"
@@ -140,7 +140,9 @@ def vf_standardize_address(row, usps_key):
     return fmt_address, fmt_street
 
 
-def build_formatted(element, usps_key, results):
+#def build_formatted(element, usps_key, results):
+def build_formatted(element, usps_key):
+
     """Generate row in formatted table."""
 
     # Copy retained fields
@@ -167,7 +169,7 @@ def build_formatted(element, usps_key, results):
 
     # Name.
     new['Name'] = "{} {} {} {}".format(
-        element['FIRSTNAME'], element['MIDDLENAME'][0],
+        element['FIRSTNAME'], element['MIDDLENAME'],
         element['LASTNAME'], element['NAMESUFFIX']
         ).replace("  ", " ").title()
 
@@ -192,8 +194,9 @@ def build_formatted(element, usps_key, results):
     new['Address'] = fmt_address
     new['StreetAddress'] = fmt_street
 
-    results.append(new)
-    return
+    #results.append(new)
+    #return
+    return new
 
 class BatchRunner(beam.DoFn):
 
@@ -251,8 +254,9 @@ def run(argv=None):
                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
 
         output = ( raw
-            | "BatchElements" >> beam.BatchElements()
-            | "BatchRunner" >> beam.ParDo(BatchRunner(), known_args.usps_key)
+            # | "BatchElements" >> beam.BatchElements()
+            # | "BatchRunner" >> beam.ParDo(BatchRunner(), known_args.usps_key)
+            | "build_formatted" >> beam.Map(build_formatted, known_args.usps_key)
             | "Voter.Formatted" >> beam.io.WriteToBigQuery(
                 table='Voter.Formatted',
                 schema=FORMATTED_SCHEMA,
