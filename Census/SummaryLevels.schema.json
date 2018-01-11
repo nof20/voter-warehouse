@@ -1,0 +1,4 @@
+[
+  {"name": "SUMLEV", "type": "integer", "mode": "required"},
+  {"name": "Description", "type": "string", "mode": "nullable"}
+]

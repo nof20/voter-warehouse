@@ -82,6 +82,11 @@ def process_second_third_file(line, filenum):
     for fielddef in SECOND_THIRD_FILE_FIELDS[filenum]:
         try:
             output[fielddef[0]] = ','.join(i for i in cols[fielddef[1]:fielddef[2]])
+            if fielddef[3] == 'int':
+                try:
+                    output[fielddef[0]] = int(output[fielddef[0]])
+                except ValueError:
+                    output[fielddef[0]] = None
         except ValueError:
             output[fielddef[0]] = None
     logrecno = output.pop('LOGRECNO', None)
