@@ -6,6 +6,7 @@ TODO:
 - Split VoterHistory, although unfortunatley this requires more involved schema definitions:
     https://reformatcode.com/code/python/json-table-schema-to-bigquerytableschema-for-bigquerysink
 
+USPS address validation is presently disabled in the code below.
 
 """
 
@@ -100,15 +101,16 @@ def vf_standardize_address(row, usps_key):
             rapartment)
     try:
         address = address.upper()
-        addr = {'address': address, 'city': row['RCITY'], 'state': 'NY'}
-        result = address_information.verify(usps_key, addr)
-        zip4 = "-{}".format(result['zip4']) if result['zip4'] else ''
-        fmt_address = "{}, {} {} {}{}".format(
-            result['address'],
-            result['city'],
-            result['state'],
-            result['zip5'],
-            zip4)
+        # addr = {'address': address, 'city': row['RCITY'], 'state': 'NY'}
+        # result = address_information.verify(usps_key, addr)
+        # zip4 = "-{}".format(result['zip4']) if result['zip4'] else ''
+        # fmt_address = "{}, {} {} {}{}".format(
+        #    result['address'],
+        #    result['city'],
+        #    result['state'],
+        #    result['zip5'],
+        #    zip4)
+        fmt_address = address
     except Exception:
         fmt_address = None
 
@@ -122,15 +124,16 @@ def vf_standardize_address(row, usps_key):
 
     try:
         street = street.upper()
-        addr = {'address': street, 'city': row['RCITY'], 'state': 'NY'}
-        result = address_information.verify(usps_key, addr)
-        zip4 = "-{}".format(result['zip4']) if result['zip4'] else ''
-        fmt_street = "{}, {} {} {}{}".format(
-            result['address'],
-            result['city'],
-            result['state'],
-            result['zip5'],
-            zip4)
+        # addr = {'address': street, 'city': row['RCITY'], 'state': 'NY'}
+        # result = address_information.verify(usps_key, addr)
+        # zip4 = "-{}".format(result['zip4']) if result['zip4'] else ''
+        # fmt_street = "{}, {} {} {}{}".format(
+        #    result['address'],
+        #    result['city'],
+        #    result['state'],
+        #    result['zip5'],
+        #    zip4)
+        fmt_street = street
     except Exception:
         fmt_street = None
 
