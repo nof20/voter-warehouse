@@ -9,10 +9,10 @@ Principles:
 
 Datasets:
 
-| Name     | Description               | Source                               |
-|----------|---------------------------|--------------------------------------|
-| Voter    | Voter rolls               | NY State Board of Elections, by mail |
-| Census   | 2010 Redistricting Census | US Census Bureau website             |
-| Polls    | Various polls             | Scraped from websites                |
-| Results  | Historic election results | [OpenElections](http://github.com/openelections), NY State Board of Elections website |
-| Finance  | Donations and campaign spending | NY State Board of Elections website |
+| Name     | Description               | Source                               | Status          |
+|----------|---------------------------|--------------------------------------|-----------------|
+| Voter    | Voter rolls               | NY State Board of Elections, by mail | In Progress     |
+| Census   | 2010 Redistricting Census | US Census Bureau website             | In Progress     |
+| Polls    | Various polls             | Scraped from websites                | Not Started     |
+| Results  | Historic election results | [OpenElections](http://github.com/openelections), NY State Board of Elections website | Not Started |
+| Finance  | Donations and campaign spending | NY State Board of Elections website | Not Started |
