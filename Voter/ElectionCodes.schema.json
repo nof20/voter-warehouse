@@ -1,0 +1,8 @@
+[
+	{"name": "Election", "type": "string"},
+	{"name": "Num", "type": "integer"},
+	{"name": "Type", "type": "string"},
+	{"name": "Date", "type": "date"},
+	{"name": "Ambiguous", "type": "boolean"}
+]
+

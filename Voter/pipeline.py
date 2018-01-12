@@ -17,7 +17,7 @@ import logging
 import csv
 import threading
 
-from pyusps import address_information
+#from pyusps import address_information
 from datetime import date, datetime
 from collections import deque
 
@@ -48,7 +48,8 @@ FORMATTED_SCHEMA = (
     "VoterRegistrationSource:STRING,IDRequired:STRING,IDMet:STRING,"
     "Status:STRING,StatusReasonCode:STRING,SBOEID:STRING,DateOfBirth:DATE,"
     "LastVotedDate:DATE,InactivatedDate:DATE,PurgedDate:DATE,Age:INTEGER,"
-    "Address:STRING,StreetAddress:STRING,VoterHistory:STRING")
+    "Address:STRING,StreetAddress:STRING,Prime:BOOLEAN,FiveYearElections:INTEGER,FiveYearPrimaries:INTEGER")
+
 
 class DictFromRawLine(beam.DoFn):
     """Parse line in input CSV and generate row in VoterFileRaw table."""
@@ -110,7 +111,11 @@ def vf_standardize_address(row, usps_key):
         #    result['state'],
         #    result['zip5'],
         #    zip4)
-        fmt_address = ", ".join(address, row['RCITY'], "NY {}".format(row['RZIP5']))
+        fmt_address = ", ".join(
+            address,
+            row['RCITY'],
+            "NY {}".format(
+                row['RZIP5']))
     except Exception:
         fmt_address = None
 
@@ -133,56 +138,71 @@ def vf_standardize_address(row, usps_key):
         #    result['state'],
         #    result['zip5'],
         #    zip4)
-        fmt_street = ", ".join(street, row['RCITY'], "NY {}".format(row['RZIP5']))
+        fmt_street = ", ".join(
+            street,
+            row['RCITY'],
+            "NY {}".format(
+                row['RZIP5']))
     except Exception:
         fmt_street = None
 
     return fmt_address, fmt_street
 
 
-#def build_formatted(element, usps_key, results):
-def build_formatted(element, usps_key):
+def convert_row(element):
+    """Convert ElectionDetails table row into tuple for inclusion in lookup dict."""
 
+    return (element['Election'], {'Type': element['Type'],
+                                  'Date': element['Date'],
+                                  'Ambiguous': element['Ambiguous']})
+
+# def build_formatted(element, usps_key, results):
+
+
+def build_formatted(element, usps_key, elections):
     """Generate row in formatted table."""
+
+    # Ignore inactive
+    if element['STATUS'] != 'ACTIVE':
+        return
 
     # Copy retained fields
     RETAIN = {'GENDER': 'Gender',
-        'ENROLLMENT': 'Enrollment',
-        'OTHERPARTY': 'OtherPartyEnrollment',
-        'ED': 'ElectionDistrict',
-        'LD': 'LegislativeDistrict',
-        'TOWNCITY': 'TownCityCode',
-        'WARD': 'Ward',
-        'CD': 'CongressionalDistrict',
-        'SD': 'SenateDistrict',
-        'AD': 'AssemblyDistrict',
-        'PREVNAME': 'PreviousName',
-        'COUNTYVRNUMBER': 'CountyVoterNumber',
-        'VRSOURCE': 'VoterRegistrationSource',
-        'IDREQUIRED': 'IDRequired',
-        'IDMET': 'IDMet',
-        'STATUS': 'Status',
-        'REASONCODE': 'StatusReasonCode',
-        'SBOEID': 'SBOEID',
-        'VoterHistory': 'VoterHistory'}
+              'ENROLLMENT': 'Enrollment',
+              'OTHERPARTY': 'OtherPartyEnrollment',
+              'ED': 'ElectionDistrict',
+              'LD': 'LegislativeDistrict',
+              'TOWNCITY': 'TownCityCode',
+              'WARD': 'Ward',
+              'CD': 'CongressionalDistrict',
+              'SD': 'SenateDistrict',
+              'AD': 'AssemblyDistrict',
+              'PREVNAME': 'PreviousName',
+              'COUNTYVRNUMBER': 'CountyVoterNumber',
+              'VRSOURCE': 'VoterRegistrationSource',
+              'IDREQUIRED': 'IDRequired',
+              'IDMET': 'IDMet',
+              'STATUS': 'Status',
+              'REASONCODE': 'StatusReasonCode',
+              'SBOEID': 'SBOEID'}
     new = {RETAIN[k]: element[k] for k in RETAIN}
 
     # Name.
     new['FullName'] = "{} {} {} {}".format(
         element['FIRSTNAME'], element['MIDDLENAME'],
         element['LASTNAME'], element['NAMESUFFIX']
-        ).replace("  ", " ").title()
+    ).replace("  ", " ").title()
 
     # Parse dates.  Must be returned as ISO string, not date object.
     DATES = {'DOB': 'DateOfBirth',
-        'LASTVOTEDDATE': 'LastVotedDate',
-        'INACT_DATE': 'InactivatedDate',
-        'PURGE_DATE': 'PurgedDate'}
+             'LASTVOTEDDATE': 'LastVotedDate',
+             'INACT_DATE': 'InactivatedDate',
+             'PURGE_DATE': 'PurgedDate'}
     for k in DATES:
         try:
             dt = date(int(element[k][:4]),
-                int(element[k][4:6]),
-                int(element[k][6:8]))
+                      int(element[k][4:6]),
+                      int(element[k][6:8]))
             new[DATES[k]] = str(dt)
             if k == 'DOB':
                 new['Age'] = int((datetime.now().date() - dt).days / 365)
@@ -194,10 +214,22 @@ def build_formatted(element, usps_key):
     new['Address'] = fmt_address
     new['StreetAddress'] = fmt_street
 
-    #results.append(new)
-    #return
+    # Calculate primary type, etc.
+    new['Prime'], new['FiveYearElections'], new['FiveYearPrimaries'] = False, 0, 0
+    for e in element['VoterHistory'].split(';'):
+        election = elections[e]
+        years_ago = (datetime.now().date() - election['Date']).days / 365
+        if years_ago < 5.0:
+            new['FiveYearElections'] += 1
+            if 'Primary' in election['Type']:
+                new['FiveYearPrimaries'] += 1
+                new['Prime'] = True
+
+    # results.append(new)
+    # return
     return new
 
+vi .s
 class BatchRunner(beam.DoFn):
 
     def process(self, batch, usps_key):
@@ -209,7 +241,7 @@ class BatchRunner(beam.DoFn):
                 t.join()
 
             t = threading.Thread(target=build_formatted,
-                    args=(row, usps_key, results))
+                                 args=(row, usps_key, results))
             t.start()
             threads.append(t)
 
@@ -219,6 +251,7 @@ class BatchRunner(beam.DoFn):
 
         for r in results:
             yield r
+
 
 def run(argv=None):
     """Main entry point; defines and runs the pipeline."""
@@ -242,9 +275,14 @@ def run(argv=None):
     with beam.Pipeline(options=pipeline_options) as p:
 
        # TODO: Select rather than hard-code bucket/file name
-        raw = (p
-               | "AllNYSVoters_2017-12-27.csv" >> beam.io.ReadFromText("gs://upload-raw/AllNYSVoters_2017-12-27.csv")
-               | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
+        raw = (p | "AllNYSVoters_2017-12-27.csv" >> beam.io.ReadFromText(
+            "gs://upload-raw/AllNYSVoters_2017-12-27-head.csv") | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
+
+        elections = (
+            p | "Voter.ElectionCodes" >> beam.io.Read(
+                beam.io.BigQuerySource(
+                    table='Voter.ElectionCodes',
+                    validate=True)) | "convert_row" >> beam.Map(convert_row))
 
         output = (
             raw | "Voter.Raw" >> beam.io.WriteToBigQuery(
@@ -253,15 +291,16 @@ def run(argv=None):
                 write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
 
-        output = ( raw
-            # | "BatchElements" >> beam.BatchElements()
-            # | "BatchRunner" >> beam.ParDo(BatchRunner(), known_args.usps_key)
-            | "build_formatted" >> beam.Map(build_formatted, known_args.usps_key)
-            | "Voter.Formatted" >> beam.io.WriteToBigQuery(
-                table='Voter.Formatted',
-                schema=FORMATTED_SCHEMA,
-                write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
-                create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
+        output = (raw
+                  # | "BatchElements" >> beam.BatchElements()
+                  # | "BatchRunner" >> beam.ParDo(BatchRunner(), known_args.usps_key)
+                  | "build_formatted" >> beam.Map(build_formatted, known_args.usps_key, beam.pvalue.AsDict(elections))
+                  | "Voter.Formatted" >> beam.io.WriteToBigQuery(
+                      table='Voter.Formatted',
+                      schema=FORMATTED_SCHEMA,
+                      write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+                      create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
+
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
