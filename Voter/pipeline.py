@@ -33,7 +33,7 @@ RAW_VF_SCHEMA = (
     "MAILADD1:STRING,MAILADD2:STRING,MAILADD3:STRING,MAILADD4:STRING,"
     "DOB:STRING,GENDER:STRING,ENROLLMENT:STRING,OTHERPARTY:STRING,"
     "COUNTYCODE:INTEGER,ED:INTEGER,LD:INTEGER,TOWNCITY:STRING,"
-    "WARD:STRING,CD:INTEGER,SD:INTEGER,AD:INTEGER,LASTVOTEDDATE:STRING,"
+    "WARD:INTEGER,CD:INTEGER,SD:INTEGER,AD:INTEGER,LASTVOTEDDATE:STRING,"
     "PREVYEARVOTED:STRING,PREVCOUNTY:STRING,PREVADDRESS:STRING,"
     "PREVNAME:STRING,COUNTYVRNUMBER:STRING,REGDATE:STRING,VRSOURCE:STRING,"
     "IDREQUIRED:STRING,IDMET:STRING,STATUS:STRING,REASONCODE:STRING,"
@@ -42,14 +42,16 @@ RAW_VF_SCHEMA = (
 
 FORMATTED_SCHEMA = (
     "FullName:STRING,Gender:STRING,Enrollment:STRING,OtherPartyEnrollment:STRING,"
-    "ElectionDistrict:INTEGER,LegislativeDistrict:INTEGER,TownCityCode:STRING,"
+    "County:STRING,ElectionDistrict:INTEGER,LegislativeDistrict:INTEGER,TownCityCode:STRING,"
     "Ward:STRING,CongressionalDistrict:INTEGER,SenateDistrict:INTEGER,"
     "AssemblyDistrict:INTEGER,PreviousName:STRING,CountyVoterNumber:STRING,"
     "VoterRegistrationSource:STRING,IDRequired:STRING,IDMet:STRING,"
-    "Status:STRING,StatusReasonCode:STRING,SBOEID:STRING,DateOfBirth:DATE,"
-    "LastVotedDate:DATE,InactivatedDate:DATE,PurgedDate:DATE,Age:INTEGER,"
+    "SBOEID:STRING,DateOfBirth:DATE,LastVotedDate:DATE,Age:INTEGER,"
     "Address:STRING,StreetAddress:STRING,Prime:BOOLEAN,FiveYearElections:INTEGER,FiveYearPrimaries:INTEGER")
 
+COUNTS_SCHEMA = (
+    "COUNTYCODE:INTEGER,County:STRING,AD:INTEGER,"
+    "WARD:INTEGER,ED:INTEGER,ENROLLMENT:STRING,Count:INTEGER")
 
 class DictFromRawLine(beam.DoFn):
     """Parse line in input CSV and generate row in VoterFileRaw table."""
@@ -149,22 +151,35 @@ def vf_standardize_address(row, usps_key):
     return fmt_address, fmt_street
 
 
-def convert_row(element):
-    """Convert ElectionDetails table row into tuple for inclusion in lookup dict."""
+def make_kv_pair(element, keys):
+    """Convert a flat dict from BQ to a K, V pair for AsDict"""
+    if ~isinstance(keys, list):
+        """Keys is a single value."""
+        el_keys = set(element.keys())
+        el_keys.remove(keys)
+        k = element[keys]
+        v = {kk: element[kk] for kk in el_keys}
 
-    return (element['Election'], {'Type': element['Type'],
-                                  'Date': element['Date'],
-                                  'Ambiguous': element['Ambiguous']})
+    else:
+        """Keys is a list, so expect to index with a tuple."""
+        el_keys = set(element.keys())
+        for key in keys:
+            el_keys.remove(key)
+        k = tuple([element[kk] for kk in keys])
+        v = {element[kk] for kk in el_keys}
+
+    return k, v
+
 
 # def build_formatted(element, usps_key, results):
 
 
-def build_formatted(element, usps_key, elections):
+def build_formatted(element, usps_key, elections, counties):
     """Generate row in formatted table."""
 
     # Ignore inactive
     if element['STATUS'] != 'ACTIVE':
-        return
+        return []
 
     # Copy retained fields
     RETAIN = {'GENDER': 'Gender',
@@ -182,8 +197,6 @@ def build_formatted(element, usps_key, elections):
               'VRSOURCE': 'VoterRegistrationSource',
               'IDREQUIRED': 'IDRequired',
               'IDMET': 'IDMet',
-              'STATUS': 'Status',
-              'REASONCODE': 'StatusReasonCode',
               'SBOEID': 'SBOEID'}
     new = {RETAIN[k]: element[k] for k in RETAIN}
 
@@ -191,13 +204,11 @@ def build_formatted(element, usps_key, elections):
     new['FullName'] = "{} {} {} {}".format(
         element['FIRSTNAME'], element['MIDDLENAME'],
         element['LASTNAME'], element['NAMESUFFIX']
-    ).replace("  ", " ").title()
+    ).replace("  ", " ").title().strip()
 
     # Parse dates.  Must be returned as ISO string, not date object.
     DATES = {'DOB': 'DateOfBirth',
-             'LASTVOTEDDATE': 'LastVotedDate',
-             'INACT_DATE': 'InactivatedDate',
-             'PURGE_DATE': 'PurgedDate'}
+             'LASTVOTEDDATE': 'LastVotedDate'}
     for k in DATES:
         try:
             dt = date(int(element[k][:4]),
@@ -215,42 +226,67 @@ def build_formatted(element, usps_key, elections):
     new['StreetAddress'] = fmt_street
 
     # Calculate primary type, etc.
-    new['Prime'], new['FiveYearElections'], new['FiveYearPrimaries'] = False, 0, 0
+    new['Prime'] = False
+    new['FiveYearElections'] = 0
+    new['FiveYearPrimaries'] = 0
     for e in element['VoterHistory'].split(';'):
-        election = elections[e]
-        years_ago = (datetime.now().date() - election['Date']).days / 365
-        if years_ago < 5.0:
-            new['FiveYearElections'] += 1
-            if 'Primary' in election['Type']:
-                new['FiveYearPrimaries'] += 1
-                new['Prime'] = True
-
+        if e:
+            try:
+                logging.debug("Looking up election: {}".format(e))
+                election = elections[e]
+                dd = str(election['Date']).split('-')
+                election_date = date(int(dd[0]), int(dd[1]), int(dd[2]))
+                years_ago = (datetime.now().date() - election_date).days / 365
+                if years_ago < 5:
+                    new['FiveYearElections'] += 1
+                    if 'Primary' in election['Type']:
+                        new['FiveYearPrimaries'] += 1
+                        new['Prime'] = True
+            except Exception as err:
+                # Ignore elections where lookup fails, or date is unknown
+                logging.debug("Caught exception: {}".format(str(err)))
+                pass
     # results.append(new)
     # return
-    return new
 
-vi .s
-class BatchRunner(beam.DoFn):
+    # County
+    c = element['COUNTYCODE']
+    logging.debug("Looking up county: {}".format(c))
+    if c in counties:
+        new['County'] = counties[c]['Name']
+    else:
+        new['County'] = None
 
-    def process(self, batch, usps_key):
-        threads = deque()
-        results = []
-        for row in batch:
-            if len(threads) > 50:
-                t = threads.popleft()
-                t.join()
+    logging.debug("Returning: {}".format(new))
+    return [new]
 
-            t = threading.Thread(target=build_formatted,
-                                 args=(row, usps_key, results))
-            t.start()
-            threads.append(t)
 
-        while threads:
-            t = threads.popleft()
-            t.join()
+def key_by_county_type(row, counties):
+    c = row['COUNTYCODE']
+    if c in counties:
+        county_name = counties[c]['Name']
+    else:
+        county_name = None
 
-        for r in results:
-            yield r
+    if row['COUNTYCODE'] in [3, 24, 30, 31, 41, 43]:
+        """Nassau and the 5 Boroughs use County, AD, ED key"""
+        k = (row['COUNTYCODE'], county_name, row['AD'], None, row['ED'], row['ENROLLMENT'])
+    else:
+        """Otherwise County, Cousub, Ward, ED"""
+        k = (row['COUNTYCODE'], county_name, None, row['WARD'], row['ED'], row['ENROLLMENT'])
+    return (k, 1)
+
+
+def flatten_sum(tup):
+    k, v = tup
+    output = {}
+    for i, field_def in enumerate(COUNTS_SCHEMA.split(',')):
+        name, typ = field_def.split(':')
+        if i < len(k):
+            output[name] = k[i]
+        else:
+            output[name] = v
+    return output
 
 
 def run(argv=None):
@@ -267,34 +303,57 @@ def run(argv=None):
         '--project=voterdb-test',
         '--job_name=voter-pipeline'])
 
-    if not known_args.usps_key:
-        raise Exception("Provide USPS API key.")
+    #if not known_args.usps_key:
+    #    raise Exception("Provide USPS API key.")
 
     pipeline_options = PipelineOptions(pipeline_args)
     pipeline_options.view_as(SetupOptions).save_main_session = True
     with beam.Pipeline(options=pipeline_options) as p:
 
        # TODO: Select rather than hard-code bucket/file name
-        raw = (p | "AllNYSVoters_2017-12-27.csv" >> beam.io.ReadFromText(
-            "gs://upload-raw/AllNYSVoters_2017-12-27-head.csv") | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
+        raw = (p
+            | "AllNYSVoters_2017-12-27.csv" >> beam.io.ReadFromText(
+                    "gs://upload-raw/AllNYSVoters_2017-12-27-head.csv")
+            | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
 
-        elections = (
-            p | "Voter.ElectionCodes" >> beam.io.Read(
+        elections = (p
+            | "Voter.ElectionCodes" >> beam.io.Read(
                 beam.io.BigQuerySource(
                     table='Voter.ElectionCodes',
-                    validate=True)) | "convert_row" >> beam.Map(convert_row))
+                    validate=True))
+            | "beam.Map(make_kv_pair, 'Election')" >> beam.Map(make_kv_pair, 'Election'))
 
-        output = (
-            raw | "Voter.Raw" >> beam.io.WriteToBigQuery(
+        counties = (p
+            | "Voter.CountyCodes" >> beam.io.Read(
+                beam.io.BigQuerySource(
+                    table='Voter.CountyCodes',
+                    validate=True))
+            | "beam.Map(make_kv_pair, 'Code')" >> beam.Map(make_kv_pair, 'Code'))
+
+        output = (raw
+            | "Voter.Raw" >> beam.io.WriteToBigQuery(
                 table='Voter.Raw',
                 schema=RAW_VF_SCHEMA,
                 write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
 
         output = (raw
+            | "key_by_county_type" >> beam.Map(key_by_county_type, beam.pvalue.AsDict(counties))
+            | "beam.CombinePerKey" >> beam.CombinePerKey(sum)
+            | "flatten_sum" >> beam.Map(flatten_sum)
+            | "Voter.Counts" >> beam.io.WriteToBigQuery(
+                table='Voter.Counts',
+                schema=COUNTS_SCHEMA,
+                write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+                create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
+
+        output = (raw
                   # | "BatchElements" >> beam.BatchElements()
                   # | "BatchRunner" >> beam.ParDo(BatchRunner(), known_args.usps_key)
-                  | "build_formatted" >> beam.Map(build_formatted, known_args.usps_key, beam.pvalue.AsDict(elections))
+                  | "build_formatted" >> beam.FlatMap(build_formatted,
+                        known_args.usps_key,
+                        beam.pvalue.AsDict(elections),
+                        beam.pvalue.AsDict(counties))
                   | "Voter.Formatted" >> beam.io.WriteToBigQuery(
                       table='Voter.Formatted',
                       schema=FORMATTED_SCHEMA,
