@@ -43,7 +43,7 @@ RAW_VF_SCHEMA = (
 FORMATTED_SCHEMA = (
     "FullName:STRING,Gender:STRING,Enrollment:STRING,OtherPartyEnrollment:STRING,"
     "County:STRING,ElectionDistrict:INTEGER,LegislativeDistrict:INTEGER,TownCityCode:STRING,"
-    "Ward:STRING,CongressionalDistrict:INTEGER,SenateDistrict:INTEGER,"
+    "Ward:INTEGER,CongressionalDistrict:INTEGER,SenateDistrict:INTEGER,"
     "AssemblyDistrict:INTEGER,PreviousName:STRING,CountyVoterNumber:STRING,"
     "VoterRegistrationSource:STRING,IDRequired:STRING,IDMet:STRING,"
     "SBOEID:STRING,DateOfBirth:DATE,LastVotedDate:DATE,Age:INTEGER,"
@@ -66,12 +66,17 @@ class DictFromRawLine(beam.DoFn):
                         if typ == "STRING":
                             dct[name] = data[i].encode('utf-8').strip()
                         elif typ == "INTEGER":
-                            dct[name] = int(data[i].encode('utf-8').strip())
-                    except Exception:
+                            try:
+                                dct[name] = int(data[i].encode('utf-8').strip())
+                            except ValueError:
+                                logging.info("Could not parse int in field {}".format(name))
+                                dct[name] = None
+                    except Exception as err:
+                        logging.info("Error in field parsing: {}".format(str(err)))
                         dct[name] = None
                 yield dct
-        except Exception:
-            logging.error("Error in csv.reader")
+        except Exception as err:
+            logging.error("Error in csv.reader: {}".format(str(err)))
 
 
 def vf_standardize_address(row, usps_key):
@@ -313,7 +318,7 @@ def run(argv=None):
        # TODO: Select rather than hard-code bucket/file name
         raw = (p
             | "AllNYSVoters_2017-12-27.csv" >> beam.io.ReadFromText(
-                    "gs://upload-raw/AllNYSVoters_2017-12-27-head.csv")
+                    "gs://upload-raw/AllNYSVoters_2017-12-27.csv")
             | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
 
         elections = (p

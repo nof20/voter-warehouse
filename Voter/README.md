@@ -1,5 +1,7 @@
 # Voter
 
+## Preparation and Metadata
+
 This pipeline creates tables within the Voter dataset, based on a manual upload
 of the New York State Voter File to Google Cloud Storage.
 
@@ -20,21 +22,38 @@ bq load Voter.ElectionCodes ElectionCodes.data.csv ElectionCodes.schema.json
 Note that the Voter county codes (Voter.CountyCodes) are different to the
 Census FIPS county codes (Census.CountyCodes).
 
-Then, to run the pipeline on Cloud Dataflow, and assuming you have the Cloud Dataflow SDK already installed:
+## Pipeline
+
+![Pipeline image](pipeline.png)
+
+The pipeline works as follows:
+* `Voter.CountyCodes` and `Voter.ElectionCodes` are loaded from BigQuery and converted to key, value (K, V) dictionaries
+* The main Voter File CSV is loaded from Cloud Storage and some basic type conversion done to create a "raw" dataset
+* Then three steps occur in parallel:
+    - The raw dataset is stored to BigQuery
+    - A function called `build_formatted` creates friendlier data, e.g. builds whole addresses and names, and calculates the number of recent elections the voter has participated in
+    - Counts of voters per party and election district are calculated.
+
+To run the pipeline on Cloud Dataflow, and assuming you have the Cloud Dataflow SDK already installed:
 
 ```
-python pipeline.py -runner=DataflowRunner --temp_location=gs://<temp bucket> --staging_location=gs://<staging bucket> --max_num_workers=21 --disk_size_gb=100
---requirements_file=requirements.txt --usps_key=<API key>
+python pipeline.py \
+  --runner=DataflowRunner \
+  --temp_location=gs://<temp bucket> \
+  --staging_location=gs://<staging bucket> \
+  --max_num_workers=8 \
+  --disk_size_gb=100
 ```
 
-This takes about 20 minutes to run over the whole NY State Voter File without
-USPS address verification, or an unknown amount of time with it switched on (many hours).
+This takes about 30 minutes to run over the whole NY State Voter File on Cloud Dataflow.
 
-NB users of the Google Cloud Platform free trial are limited to a maximum of
-8 consecutive VMs and 2 TB of persistent disk.
+NB users of the Google Cloud Platform free trial are limited to a maximum of 8 consecutive VMs and 2 TB of persistent disk.
 
-To test with a sample dataset in local mode:
+To test with a sample dataset in local mode, edit the address of the voter file in the code to point to a cut-down version, and run:
 
 ```
-python pipeline.py -runner=DirectRunner --temp_location=gs://<temp bucket> --staging_location=gs://<staging bucket> --requirements_file=requirements.txt --usps_key=<API key>
+python pipeline.py \
+  --runner=DirectRunner \
+  --temp_location gs://voterdb-test-dataflow-temp/ \
+  --staging_location gs://voterdb-test-dataflow-staging/ \
 ```
