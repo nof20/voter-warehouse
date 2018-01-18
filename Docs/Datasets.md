@@ -62,3 +62,11 @@ State Board of Elections Election Districts.
     - Occupied housing units
     - Vacant housing units
     - The Election District(s) which map to this Vote Tabulation District.
+
+## Polls
+
+The Polls dataset is based on public poll data, scraped from websites.
+
+At present this contains one table:
+
+* `Polls.GenericCongressionalVote`, scraped from the Real Clear Politics website.
