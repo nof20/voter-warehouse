@@ -15,8 +15,7 @@ Google Cloud Platform account.  This is free, and you get a further [$300 credit
 
 * Sign in with your Google (e.g. Gmail) account.
 * Go to the [Google Cloud Platform Console](http://console.cloud.google.com).
-* [Create a project](https://console.cloud.google.com/cloud-resource-manager).  
-This is your personal workspace; the name doesn't matter.
+* [Create a project](https://console.cloud.google.com/cloud-resource-manager).  This is your personal workspace; the name doesn't matter.
 * Enable billing.  Open the console left side menu and select 'Billing'.  Click the
 new billing account button, enter a name and your personal details, then click
 'Submit and enable billing.'
@@ -32,7 +31,7 @@ provide information about the organizations you're affiliated with.
 
 ## Run your first query
 
-BigQuery, like most databases, uses a very common syntax called SQL (Structured
+BigQuery, like most databases, uses a very common language called SQL (Structured
 Query Language).  A simple query might be:
 
 ```
@@ -53,7 +52,21 @@ To run this:
 * Click the red "Compose Query" button on the top left hand corner.
 * Copy and paste the code above into the Query box.
 * Click "Run Query".
-* You should see results in the table at the bottom.
+
+You should see results in the table at the bottom, which look like this:
+
+| Row |	FullName |	Gender | DateOfBirth |
+|-----|----------|---------|-------------|
+| 1	  | Mary Smith | F | 1940-11-02	 |
+| 2	  | Jack Harken |	M	| 1937-03-17	 |
+| 3   |	Johanna Larsson |	F |	1969-11-20	 |
+| 4 |	Oleg Klatshkov |	M | 	1956-08-12	 |
+| 5 |	Fei Fei Wong |	F |	1948-10-18	 |
+| 6	 | Janet De Bono |	F |	1955-01-15	 |
+| 7 |	Alessandra Greenberg |	F	| 1964-12-24	 |
+| 8 |	Brian Goonan |	M	| 1937-05-14	 |
+| 9 |	John F Miller |	M	| 1957-08-31	 |
+| 10 |	John Roberts	| M |	1936-02-23	 |
 
 You made it!
 
