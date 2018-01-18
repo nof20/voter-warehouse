@@ -50,7 +50,7 @@ This means:
 To run this:
 * Go to [BigQuery](https://bigquery.cloud.google.com).
 * Click the red "Compose Query" button on the top left hand corner.
-* Copy and paste the code above into the Query box.
+* Copy and paste ALL of the code above into the Query box.  Be sure to include the first line, "#standardSQL" - this tells BigQuery to use industry standard syntax.
 * Click "Run Query".
 
 You should see results in the table at the bottom, which look like this:
@@ -74,9 +74,5 @@ To learn more about SQL, you can take the free online SQL Tutorial at [w3schools
 
 You can learn more about how BigQuery works by following their [Quickstart
 Tutorial](https://cloud.google.com/bigquery/quickstart-web-ui).
-
-If you're more experienced with SQL you might notice that the "#standardSQL"
-command at the top of the statement is not itself part of SQL.  This is because
-BigQuery defaults to an earlier, non-standard syntax.
 
 Next step: read more about the [Datasets](Datasets.md).
