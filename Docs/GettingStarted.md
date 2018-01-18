@@ -1,0 +1,69 @@
+# Getting Started
+
+Before we start, some basic information about the platform.
+
+[BigQuery](https://cloud.google.com/bigquery/) is Google's serverless, highly scalable, low cost enterprise data warehouse.  It is different from a traditional database because instead of
+paying for a server to run all the time, you only pay when you analyze data,
+and the first 1 TB of query and 10 GB of data stored are completely free.
+
+`voter-warehouse` maintains datasets in BigQuery for everyone to use.
+
+## Get setup with Google Cloud
+
+To access the `voter-warehouse` data in BigQuery, you first need to sign up for a
+Google Cloud Platform account.  This is free, and you get a further [$300 credit](https://cloud.google.com/free/) for your first year.  To do this:
+
+* Sign in with your Google (e.g. Gmail) account.
+* Go to the [Google Cloud Platform Console](http://console.cloud.google.com).
+* [Create a project](https://console.cloud.google.com/cloud-resource-manager).  
+This is your personal workspace; the name doesn't matter.
+* Enable billing.  Open the console left side menu and select 'Billing'.  Click the
+new billing account button, enter a name and your personal details, then click
+'Submit and enable billing.'
+
+While the datasets are maintained by the `voter-warehouse` project, any costs
+you incur in excess of the free tier are billed directly to you.
+
+## Get permission on the data
+
+Because `voter-warehouse` includes personally-identifying data, the datasets are
+not open to the public.  Email `contact@voterdb.org` to be permissioned, and
+provide information about the organizations you're affiliated with.
+
+## Run your first query
+
+BigQuery, like most databases, uses a very common syntax called SQL (Structured
+Query Language).  A simple query might be:
+
+```
+#standardSQL
+SELECT FullName, Gender, DateOfBirth
+FROM Voter.Formatted
+LIMIT 10;
+```
+
+This means:
+* Tell BigQuery to use standard SQL syntax
+* Get the fields "FullName", "Gender", and "DateOfBirth"
+* From the table called "Voter.Formatted"
+* Up to a maximum of 10 rows.
+
+To run this:
+* Go to [BigQuery](https://bigquery.cloud.google.com).
+* Click the red "Compose Query" button on the top left hand corner.
+* Copy and paste the code above into the Query box.
+* Click "Run Query".
+* You should see results in the table at the bottom.
+
+You made it!
+
+To learn more about SQL, you can take the free online SQL Tutorial at [w3schools.com](https://www.w3schools.com/sql/default.asp).
+
+You can learn more about how BigQuery works by following their [Quickstart
+Tutorial](https://cloud.google.com/bigquery/quickstart-web-ui).
+
+If you're more experienced with SQL you might notice that the "#standardSQL"
+command at the top of the statement is not itself part of SQL.  This is because
+BigQuery defaults to an earlier, non-standard syntax.
+
+Next step: read more about the [Datasets](Datasets.md).

@@ -9,10 +9,9 @@ unzip ny2010.pl.zip
 gsutil cp *.pl gs://upload-raw/census/
 ```
 
-Load the Redistricting Equivalents and CountyCodes metadata:
+Load the SummaryLevels metadata:
 
 ```
-python load_redistequiv.py
 bq load Census.SummaryLevels SummaryLevels.data.csv SummaryLevels.schema.json
 ```
 
@@ -27,9 +26,10 @@ python pipeline.py \
   --runner=DataflowRunner \
   --temp_location=gs://<temp bucket> \
   --staging_location=gs://<staging bucket> \
-  --max_num_workers=8 \
+  --max_num_workers=1 \
   --disk_size_gb=100
 ```
 
 At present the pipeline relies on the files being present in GCS bucket
-`gs://upload-raw/census/`.
+`gs://upload-raw/census/`.  The pipeline takes about 14 minutes to complete
+on one worker.
