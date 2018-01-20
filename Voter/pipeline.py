@@ -109,15 +109,6 @@ def vf_standardize_address(row, usps_key):
             rapartment).replace("  ", " ")
     try:
         address = address.upper()
-        # addr = {'address': address, 'city': row['RCITY'], 'state': 'NY'}
-        # result = address_information.verify(usps_key, addr)
-        # zip4 = "-{}".format(result['zip4']) if result['zip4'] else ''
-        # fmt_address = "{}, {} {} {}{}".format(
-        #    result['address'],
-        #    result['city'],
-        #    result['state'],
-        #    result['zip5'],
-        #    zip4)
         fmt_address = ", ".join(
             address,
             row['RCITY'],
@@ -136,15 +127,6 @@ def vf_standardize_address(row, usps_key):
 
     try:
         street = street.upper()
-        # addr = {'address': street, 'city': row['RCITY'], 'state': 'NY'}
-        # result = address_information.verify(usps_key, addr)
-        # zip4 = "-{}".format(result['zip4']) if result['zip4'] else ''
-        # fmt_street = "{}, {} {} {}{}".format(
-        #    result['address'],
-        #    result['city'],
-        #    result['state'],
-        #    result['zip5'],
-        #    zip4)
         fmt_street = ", ".join(
             street,
             row['RCITY'],

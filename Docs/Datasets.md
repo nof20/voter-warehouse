@@ -44,7 +44,7 @@ online from the US Census Bureau.
 
 This is broken out into four tables:
 
-* `Census.Raw`, the full contents of the New York files (444 MB, 635,000 rows)
+* `Census.Raw`, the full contents of the New York Redistricting Census (444 MB, 635,000 rows)
 * `Census.SummaryLevels`, a lookup table of Census Summary Levels.  Each row in
 the `Census.Raw` table might correspond to the whole state, a county, or a smaller
 unit.
@@ -70,3 +70,7 @@ The Polls dataset is based on public poll data, scraped from websites.
 At present this contains one table:
 
 * `Polls.GenericCongressionalVote`, scraped from the Real Clear Politics website.
+
+## Results
+
+* `Results.OpenElections` is the full set of results from the NY Open elections project on Github.

@@ -9,9 +9,10 @@ TODO:
 * Replace different models for creating BQ Schema with one approach
 * Replace dependency on pre-load of Census files to GCS with download, e.g.
 
+    resp = requests.get(...)
     with open(filename, 'wb') as fd:
-    for chunk in r.iter_content(chunk_size=128):
-        fd.write(chunk)
+        for chunk in resp.iter_content(chunk_size=128):
+            fd.write(chunk)
 
 * Replace AsList(redist_equiv) with a CoGroupByKey
 
