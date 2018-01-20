@@ -69,7 +69,7 @@ class DictFromRawLine(beam.DoFn):
                             try:
                                 dct[name] = int(data[i].encode('utf-8').strip())
                             except ValueError:
-                                logging.info("Could not parse int in field {}".format(name))
+                                logging.debug("Could not parse int in field {}".format(name))
                                 dct[name] = None
                     except Exception as err:
                         logging.info("Error in field parsing: {}".format(str(err)))
@@ -79,7 +79,7 @@ class DictFromRawLine(beam.DoFn):
             logging.error("Error in csv.reader: {}".format(str(err)))
 
 
-def vf_standardize_address(row, usps_key):
+def vf_standardize_address(row):
     """Used for the NY State Voter File only."""
     rhalfcode = '' if not row['RHALFCODE'] else row['RHALFCODE']
     raddnumber = '' if not row['RADDNUMBER'] else row['RADDNUMBER']
@@ -107,17 +107,10 @@ def vf_standardize_address(row, usps_key):
             rstreetname,
             rpostdirection,
             rapartment).replace("  ", " ")
-    try:
-        address = address.upper()
-        fmt_address = ", ".join(
-            address,
-            row['RCITY'],
-            "NY {}".format(
-                row['RZIP5']))
-    except Exception:
-        fmt_address = None
+    address = address.strip().upper()
+    fmt_address = ", ".join([address, row['RCITY'], "NY {}".format(row['RZIP5'])])
 
-    # Build and verify street address (for geolocation)
+    # Build and verify street address (for later geolocation)
     street = "{} {} {} {} {}".format(
         raddnumber,
         rhalfcode,
@@ -125,15 +118,8 @@ def vf_standardize_address(row, usps_key):
         rstreetname,
         rpostdirection)
 
-    try:
-        street = street.upper()
-        fmt_street = ", ".join(
-            street,
-            row['RCITY'],
-            "NY {}".format(
-                row['RZIP5']))
-    except Exception:
-        fmt_street = None
+    street = street.strip().upper()
+    fmt_street = ", ".join([street, row['RCITY'], "NY {}".format(row['RZIP5'])])
 
     return fmt_address, fmt_street
 
@@ -158,10 +144,7 @@ def make_kv_pair(element, keys):
     return k, v
 
 
-# def build_formatted(element, usps_key, results):
-
-
-def build_formatted(element, usps_key, elections, counties):
+def build_formatted(element, elections, counties):
     """Generate row in formatted table."""
 
     # Ignore inactive
@@ -208,7 +191,7 @@ def build_formatted(element, usps_key, elections, counties):
             new[DATES[k]] = None
 
     # Address fields
-    fmt_address, fmt_street = vf_standardize_address(element, usps_key)
+    fmt_address, fmt_street = vf_standardize_address(element)
     new['Address'] = fmt_address
     new['StreetAddress'] = fmt_street
 
@@ -233,12 +216,9 @@ def build_formatted(element, usps_key, elections, counties):
                 # Ignore elections where lookup fails, or date is unknown
                 logging.debug("Caught exception: {}".format(str(err)))
                 pass
-    # results.append(new)
-    # return
 
     # County
     c = element['COUNTYCODE']
-    logging.debug("Looking up county: {}".format(c))
     if c in counties:
         new['County'] = counties[c]['Name']
     else:
@@ -338,7 +318,6 @@ def run(argv=None):
                   # | "BatchElements" >> beam.BatchElements()
                   # | "BatchRunner" >> beam.ParDo(BatchRunner(), known_args.usps_key)
                   | "build_formatted" >> beam.FlatMap(build_formatted,
-                        known_args.usps_key,
                         beam.pvalue.AsDict(elections),
                         beam.pvalue.AsDict(counties))
                   | "Voter.Formatted" >> beam.io.WriteToBigQuery(
