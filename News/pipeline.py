@@ -28,7 +28,7 @@ USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/604.4.
 SCHEMA_FIELDS = [
     ('keyword', 'string', 'nullable'),
     ('title', 'string', 'nullable'),
-    ('link', 'string', 'nullable'),
+    ('url', 'string', 'nullable'),
     ('pubdate', 'timestamp', 'nullable'),
     ('text', 'string', 'nullable'),
     ('entities', 'record', 'repeated', (
@@ -109,23 +109,27 @@ def get_news_items(row):
         m = re.search(r'<title>(.*)</title><link/>(.*?)<.*<pubdate>(.*)</pubdate>', str(item))
         if m:
             title = m.group(1)
-            link = m.group(2)
+            url = m.group(2)
             pubdate = m.group(3)
             text = None
-            logging.info("Found keyword '{}' in URL '{}'".format(row, link))
+            logging.info("Found keyword '{}' in URL '{}'".format(row, url))
             try:
-                rr = get(link, headers={'User-Agent': USER_AGENT})
+                rr = get(url, headers={'User-Agent': USER_AGENT})
                 rr.raise_for_status()
                 soup = BeautifulSoup(rr.text, 'lxml')
                 text = text_from_html(rr.text)
                 if isinstance(text, str):
-                    text = unicode(text, errors='ignore')
+                    text = unicode(text, errors='replace')
+                if isinstance(title, str):
+                    title = unicode(title, errors='replace')
+                if isinstance(url, str):
+                    url = unicode(url, errors='replace')
             except Exception as err:
-                logging.error('Failed getting keyword "{}" in URL {}: {}'.format(row, link, str(err)))
+                logging.error('Failed getting keyword "{}" in URL {}: {}'.format(row, url, str(err)))
 
             output.append({'keyword': row,
                 'title': title,
-                'link': link,
+                'url': url,
                 'pubdate': pubdate,
                 'text': text})
     return output
@@ -154,7 +158,7 @@ class BatchRunner(beam.DoFn):
 
 def analyze(row, results):
     if row['text']:
-        logging.info("Analyzing URL {}".format(row['link']))
+        logging.info("Analyzing URL {}".format(row['url']))
         client = language.LanguageServiceClient()
         document = types.Document(
             content=row['text'],
@@ -185,9 +189,11 @@ def analyze(row, results):
 
 
 def format_bq(row):
-    # Truncate text to avoid UTF-8 64 kb string limit
+    # Truncate and encode text to 64 kb UTF-8
     LIMIT = 64 * 1024
-    row['text'] = row['text'][:LIMIT]
+    row['text'] = row['text'][:LIMIT].encode('ascii', errors='replace')
+    row['title'] = row['title'][:LIMIT].encode('ascii', errors='replace')
+    row['url'] = row['url'][:LIMIT].encode('ascii', errors='replace')
     # Parse and re-encode pubdate timestamp
     pubdate = datetime.strptime(row['pubdate'], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
     row['pubdate'] = pubdate
