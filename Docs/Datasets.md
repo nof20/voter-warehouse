@@ -73,4 +73,6 @@ At present this contains one table:
 
 ## Results
 
-* `Results.OpenElections` is the full set of results from the NY Open elections project on Github.
+* `Results.OpenElections` is the full set of results from the NY Open elections project on Github. (255 MB, 1.29 million rows)
+
+Next: see [example queries](ExampleQueries.md).

@@ -1,0 +1,4 @@
+requests
+lxml
+beautifulsoup4
+google-cloud-language
