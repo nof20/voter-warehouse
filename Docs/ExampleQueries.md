@@ -25,6 +25,7 @@ GROUP BY Enrollment
 ```
 
 |Row|Enrollment|Num|
+|---|----------|---|
 |1|DEM|156765|
 |2|IND|3848|
 |3|REP|11024|
