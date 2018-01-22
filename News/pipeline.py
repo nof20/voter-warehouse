@@ -40,7 +40,9 @@ SCHEMA_FIELDS = [
     )
 ]
 
-KEYWORDS = ['Lee Zeldin']
+KEYWORDS = ['Lee Zeldin', 'Jeff Klein', 'John Faso', 'Marisol Alcantara',
+    'David Valesky', 'David Carlucci', 'Diane Savino', 'Tony Avella',
+    'Jose Peralta']
 
 def gen_kind_schema(tup):
     kind_schema = bigquery.TableFieldSchema()
@@ -90,7 +92,7 @@ def tag_visible(element):
     return True
 
 def text_from_html(body):
-    soup = BeautifulSoup(body, 'lxml')
+    soup = BeautifulSoup(body, 'html.parser')
     texts = soup.findAll(text=True)
     visible_texts = filter(tag_visible, texts)
     return u" ".join(t.strip() for t in visible_texts)
@@ -102,7 +104,7 @@ def get_news_items(row):
     params = {'ned': 'us', 'gl': 'US', 'hl': 'en'}
     resp = get(url, params=params, headers={'User-Agent': USER_AGENT})
     resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, 'lxml')
+    soup = BeautifulSoup(resp.text, 'html.parser')
     items = soup.find_all('item')
     output = []
     for item in items:
@@ -116,7 +118,7 @@ def get_news_items(row):
             try:
                 rr = get(url, headers={'User-Agent': USER_AGENT})
                 rr.raise_for_status()
-                soup = BeautifulSoup(rr.text, 'lxml')
+                soup = BeautifulSoup(rr.text, 'html.parser')
                 text = text_from_html(rr.text)
                 if isinstance(text, str):
                     text = unicode(text, errors='replace')
@@ -132,6 +134,8 @@ def get_news_items(row):
                 'url': url,
                 'pubdate': pubdate,
                 'text': text})
+    if len(items) == 0:
+        logging.error("Zero items in Google News feed, something went wrong")
     return output
 
 class BatchRunner(beam.DoFn):
@@ -159,6 +163,7 @@ class BatchRunner(beam.DoFn):
 def analyze(row, results):
     if row['text']:
         logging.info("Analyzing URL {}".format(row['url']))
+        # See https://developers.google.com/api-client-library/python/guide/thread_safety.
         client = language.LanguageServiceClient()
         document = types.Document(
             content=row['text'],
