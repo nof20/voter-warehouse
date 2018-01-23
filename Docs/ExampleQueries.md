@@ -12,7 +12,7 @@ AND County = "Queens"
 ```
 
 |Row|FullName|Gender|Enrollment|DateOfBirth|FiveYearElections|FiveYearPrimaries|
-|---|--------|------|----------|-----------|-----------------|-----------------||
+|---|--------|------|----------|-----------|-----------------|-----------------|
 |1|John Simonian|M|DEM|1956-02-27|10|5|
 
 Get summary of voters by enrollment (party) in a given district:
