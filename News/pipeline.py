@@ -10,6 +10,7 @@ import logging
 import sys
 import apache_beam as beam
 import threading
+import xml.etree.ElementTree as ET
 
 from collections import deque
 from datetime import date, datetime
@@ -104,36 +105,32 @@ def get_news_items(row):
     params = {'ned': 'us', 'gl': 'US', 'hl': 'en'}
     resp = get(url, params=params, headers={'User-Agent': USER_AGENT})
     resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, 'html.parser')
-    items = soup.find_all('item')
+    tree = ET.fromstring(resp.text.encode('ascii', errors='replace'))
+    items = tree.find('channel').findall('item')
     output = []
     for item in items:
-        m = re.search(r'<title>(.*)</title><link/>(.*?)<.*<pubdate>(.*)</pubdate>', str(item))
-        if m:
-            title = m.group(1)
-            url = m.group(2)
-            pubdate = m.group(3)
-            text = None
-            logging.info("Found keyword '{}' in URL '{}'".format(row, url))
-            try:
-                rr = get(url, headers={'User-Agent': USER_AGENT})
-                rr.raise_for_status()
-                soup = BeautifulSoup(rr.text, 'html.parser')
-                text = text_from_html(rr.text)
-                if isinstance(text, str):
-                    text = unicode(text, errors='replace')
-                if isinstance(title, str):
-                    title = unicode(title, errors='replace')
-                if isinstance(url, str):
-                    url = unicode(url, errors='replace')
-            except Exception as err:
-                logging.error('Failed getting keyword "{}" in URL {}: {}'.format(row, url, str(err)))
+        dct = {item[i].tag: item[i].text for i in range(len(item))}
+        text = None
+        logging.info("Found keyword '{}' in URL '{}'".format(row, dct['link']))
+        try:
+            rr = get(url, headers={'User-Agent': USER_AGENT})
+            rr.raise_for_status()
+            soup = BeautifulSoup(rr.text, 'html.parser')
+            text = text_from_html(rr.text)
+            if isinstance(text, str):
+                text = unicode(text, errors='replace')
+            if isinstance(dct['title'], str):
+                dct['title'] = unicode(dct['title'], errors='replace')
+            if isinstance(dct['link'], str):
+                dct['link'] = unicode(dct['link'], errors='replace')
+        except Exception as err:
+            logging.error('Failed getting keyword "{}" in URL {}: {}'.format(row, url, str(err)))
 
-            output.append({'keyword': row,
-                'title': title,
-                'url': url,
-                'pubdate': pubdate,
-                'text': text})
+        output.append({'keyword': row,
+            'title': dct['title'],
+            'url': dct['link'],
+            'pubdate': dct['pubDate'],
+            'text': text})
     if len(items) == 0:
         logging.error("Zero items in Google News feed, something went wrong")
     return output
@@ -232,7 +229,7 @@ def run(argv=None):
             | "News.Semantic" >> beam.io.WriteToBigQuery(
                 table='News.Semantic',
                 schema=gen_schema(SCHEMA_FIELDS),
-                write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+                write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
 
 
