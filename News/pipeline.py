@@ -93,7 +93,7 @@ def tag_visible(element):
     return True
 
 def text_from_html(body):
-    soup = BeautifulSoup(body, 'html.parser')
+    soup = BeautifulSoup(body)
     texts = soup.findAll(text=True)
     visible_texts = filter(tag_visible, texts)
     return u" ".join(t.strip() for t in visible_texts)
@@ -115,7 +115,7 @@ def get_news_items(row):
         try:
             rr = get(url, headers={'User-Agent': USER_AGENT})
             rr.raise_for_status()
-            soup = BeautifulSoup(rr.text, 'html.parser')
+            soup = BeautifulSoup(rr.text)
             text = text_from_html(rr.text)
             if isinstance(text, str):
                 text = unicode(text, errors='replace')
