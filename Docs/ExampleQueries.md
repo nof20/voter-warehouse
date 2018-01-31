@@ -57,3 +57,25 @@ WHERE e.AD = 67
 |3|New York County|Manhattan borough|1354|121|979|70|1154|994|160|67|12|
 |4|New York County|Manhattan borough|7|1|0|6|0|0|0|67|118|
 |5|New York County|Manhattan borough|1425|130|1020|59|1042|990|52|67|6|
+
+## Results
+
+```
+#standardSQL
+SELECT office, district, candidate, sum(votes) AS Votes
+FROM Results.Curated
+WHERE county='Suffolk'
+AND election_date='2016-11-08'
+AND candidate NOT IN ('Blank', 'Scattering', 'Void')
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3
+```
+
+|Row|office|district|candidate|Votes|
+|---|------|--------|---------|-----|	 
+|1|U.S. House|1|Anna E. Throne-Holst|135278|
+|2|U.S. House|1|Lee M. Zeldin|188499|
+|3|U.S. House|2|Du Wayne Gregory|86835|
+|4|U.S. House|2|Peter T. King|114559|
+|5|U.S. House|3|Jack M. Martins|58857|
+|6|U.S. House|3|Thomas R. Suozzi|56166|
