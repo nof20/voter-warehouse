@@ -48,6 +48,7 @@ GROUP BY 1
 ```
 
 |Row|SD|Num|
+|---|--|---|
 |1|31|1680|
 |2|28|19293|
 |3|27|65896|
@@ -82,6 +83,7 @@ FROM Results.Curated
 WHERE county='Suffolk'
 AND election_date='2016-11-08'
 AND candidate NOT IN ('Blank', 'Scattering', 'Void')
+AND district IN (1, 2, 3)
 GROUP BY 1, 2, 3
 ORDER BY 1, 2, 3
 ```
