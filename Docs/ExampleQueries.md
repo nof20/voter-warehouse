@@ -37,6 +37,21 @@ GROUP BY Enrollment
 |9|WEP|85|
 |10|REF|13|
 
+Get summary of State Senate districts overlapping with AD 75, with voter count in each one:
+
+```
+SELECT SD, COUNT(*) AS Num
+FROM Voter.Raw
+WHERE AD = 75
+AND STATUS = "ACTIVE"
+GROUP BY 1
+```
+
+|Row|SD|Num|
+|1|31|1680|
+|2|28|19293|
+|3|27|65896|
+
 ## Census
 
 Get data for a specific district:

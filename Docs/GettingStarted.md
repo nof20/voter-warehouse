@@ -48,7 +48,7 @@ This means:
 * Up to a maximum of 10 rows.
 
 To run this:
-* Go to [BigQuery](https://bigquery.cloud.google.com).
+* Go to BigQuery on the web at [https://bigquery.cloud.google.com].
 * Click the red "Compose Query" button on the top left hand corner.
 * Copy and paste ALL of the code above into the Query box.  Be sure to include the first line, "#standardSQL" - this tells BigQuery to use industry standard syntax.
 * Click "Run Query".
