@@ -272,7 +272,11 @@ def run(argv=None):
     known_args, pipeline_args = parser.parse_known_args(argv)
     pipeline_args.extend([
         '--project=voterdb-test',
-        '--job_name=census-pipeline'])
+        '--job_name=census-pipeline',
+        '--temp_location gs://voterdb-test-dataflow-temp/',
+        '--staging_location gs://voterdb-test-dataflow-staging/',
+        '--max_num_workers=8',
+        '--disk_size_gb=100'])
 
     pipeline_options = PipelineOptions(pipeline_args)
     pipeline_options.view_as(SetupOptions).save_main_session = True
