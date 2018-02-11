@@ -14,10 +14,10 @@ Datasets:
 |----------|---------------------------|--------------------------------------|-----------------|
 | Voter    | Voter rolls               | NY State Board of Elections, by mail | OK              |
 | Census   | 2010 Redistricting Census | US Census Bureau website             | OK              |
-| Polls    | Various polls             | Scraped from websites                | In Progress     |
+| Polls    | Various polls             | Scraped from websites                | OK     |
 | Results  | Historic election results | [OpenElections](http://github.com/openelections), NY State Board of Elections website | OK |
-| Finance  | Donations and campaign spending | NY State Board of Elections website | In Progress |
-| News     | Semantic analysis of News | Google News                          | In Progress |
+| Finance  | Donations and campaign spending | NY State Board of Elections website | OK |
+| News     | Semantic analysis of News | Google News                          | OK |
 
 To get started as a user, see [Getting Started](Docs/GettingStarted.md).
 
