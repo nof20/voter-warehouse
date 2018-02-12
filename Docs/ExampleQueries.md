@@ -76,6 +76,8 @@ WHERE e.AD = 67
 
 ## Results
 
+Get 2016 election vote totals for Suffolk County only, Congressional Districts 1-3:
+
 ```
 #standardSQL
 SELECT office, district, candidate, sum(votes) AS Votes
@@ -96,3 +98,23 @@ ORDER BY 1, 2, 3
 |4|U.S. House|2|Peter T. King|114559|
 |5|U.S. House|3|Jack M. Martins|58857|
 |6|U.S. House|3|Thomas R. Suozzi|56166|
+
+## Finance
+
+Generate a summary by year of fundraising for State Senate District 22:
+
+```
+SELECT FilingYear, FilerID, FilerName, FORMAT("$%'.0f", SUM(Amt)) AS Raised
+FROM Finance.State
+WHERE FilingYear > 2016
+AND Office = "State Senator"
+AND Dist = 22
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3
+```
+
+|Row|FilingYear|FilerID|FilerName|Raised|
+|1|2017|A13015|FRIENDS OF MARTY GOLDEN|$225,920|
+|2|2017|A22005|ROSS BARKAN FOR NEW YORK|$16,605|
+|3|2018|A13015|FRIENDS OF MARTY GOLDEN|$339,297|
+|4|2018|A22005|ROSS BARKAN FOR NEW YORK|$50,500|

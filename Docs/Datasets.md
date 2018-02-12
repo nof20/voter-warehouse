@@ -76,4 +76,12 @@ At present this contains one table:
 * `Results.OpenElections` is the full set of results from the NY Open elections project on Github. (255 MB, 1.29 million rows).  Note this data set is produced by a variety of volunteers, and sometimes has gaps and duplicate data (e.g. 'Total' rows included).
 * `Results.Curated` is a curated set of election results, taken directly from the New York Board of Elections Website.  This has been reviewed manually to ensure completeness and accuracy, although doesn't cover as many races as OpenElections.
 
+## Finance
+
+* `Finance.State` is a table of contributions made to certain campaigns and reported to the New York State Board of Elections.  Disclosure time limits are set by Election Law and vary depending on the point in the cycle.  Currently the following campaigns are queried:
+    - Governor
+    - Lieutenant Governor
+    - All State Senate seats
+    - State Assembly Districts 9 and 75.
+
 Next: see [example queries](ExampleQueries.md).
