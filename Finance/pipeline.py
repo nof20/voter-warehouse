@@ -269,6 +269,7 @@ def get_reports(row):
             if (len(cells) == len(headings)) and ('Total Contributions Received' not in cells[1]):
                 row_data = {headings[i]: cell.get_text(separator='\n') for i, cell in enumerate(cells)}
                 row_data['Date'] = datetime.strptime(row_data['Date'], "%d-%b-%y").strftime("%Y-%m-%d")
+                row_data['Amt'] = row_data['Amt'].replace(',', '')
                 row_data.update(row)
                 results.append({k.replace(' ', ''): v for k, v in row_data.items()})
 
