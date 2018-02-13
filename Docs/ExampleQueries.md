@@ -114,6 +114,7 @@ ORDER BY 1, 2, 3
 ```
 
 |Row|FilingYear|FilerID|FilerName|Raised|
+|---|----------|-------|---------|------|
 |1|2017|A13015|FRIENDS OF MARTY GOLDEN|$225,920|
 |2|2017|A22005|ROSS BARKAN FOR NEW YORK|$16,605|
 |3|2018|A13015|FRIENDS OF MARTY GOLDEN|$339,297|
