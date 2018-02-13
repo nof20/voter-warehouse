@@ -80,24 +80,24 @@ Get 2016 election vote totals for Suffolk County only, Congressional Districts 1
 
 ```
 #standardSQL
-SELECT office, district, candidate, sum(votes) AS Votes
+SELECT office, district, candidate, ARRAY_TO_STRING(ARRAY_AGG(party), ", ") AS Parties, sum(votes) AS Votes
 FROM Results.Curated
 WHERE county='Suffolk'
 AND election_date='2016-11-08'
-AND candidate NOT IN ('Blank', 'Scattering', 'Void')
+AND candidate NOT IN ('Blank', 'Scattering', 'Void', 'Total')
 AND district IN (1, 2, 3)
 GROUP BY 1, 2, 3
 ORDER BY 1, 2, 3
 ```
 
-|Row|office|district|candidate|Votes|
-|---|------|--------|---------|-----|	 
-|1|U.S. House|1|Anna E. Throne-Holst|135278|
-|2|U.S. House|1|Lee M. Zeldin|188499|
-|3|U.S. House|2|Du Wayne Gregory|86835|
-|4|U.S. House|2|Peter T. King|114559|
-|5|U.S. House|3|Jack M. Martins|58857|
-|6|U.S. House|3|Thomas R. Suozzi|56166|
+|Row|office|district|candidate|Parties|Votes|
+|---|------|--------|---------|-------|-----|
+|1|U.S. House|1|Anna E. Throne-Holst|DEM, WEP, WOR|135278.0|
+|2|U.S. House|1|Lee M. Zeldin|REP, IND, CON, REF|188499.0|
+|3|U.S. House|2|Du Wayne Gregory|DEM, IND, WOR, WEP|86835.0|
+|4|U.S. House|2|Peter T. King	CON, REP/TRP, REF|114559.0|
+|5|U.S. House|3|Jack M. Martins|REP, CON, REF|58857.0|
+|6|U.S. House|3|Thomas R. Suozzi|DEM|56166.0|
 
 ## Finance
 
