@@ -53,6 +53,26 @@ GROUP BY 1
 |2|28|19293|
 |3|27|65896|
 
+How many voters in Brookhaven ED 1 voted in the 2016 Presidential Primary?
+
+```
+SELECT r.ENROLLMENT, ec.Date, ec.Type, COUNT(*) AS Num
+FROM Voter.Raw r, UNNEST(SPLIT(r.VoterHistory, ';')) v
+JOIN Voter.ElectionCodes ec ON v = ec.Election
+WHERE r.TOWNCITY = "BROOKHAVEN"
+AND r.ED = 1
+AND ec.Date > "2016-01-01"
+AND ec.Type = "Presidential Primary"
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3
+```
+
+|Row|ENROLLMENT|Date|Type|Num|
+|---|----------|----|----|---|
+|1|BLK|2016-04-19|Presidential Primary|2|
+|2|DEM|2016-04-19|Presidential Primary|190|
+|3|REP|2016-04-19|Presidential Primary|127|
+
 ## Census
 
 Get data for a specific district:
