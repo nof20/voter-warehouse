@@ -279,8 +279,8 @@ def run(argv=None):
 
        # TODO: Select rather than hard-code bucket/file name
         raw = (p
-            | "AllNYSVoters_2017-12-27.csv" >> beam.io.ReadFromText(
-                    "gs://upload-raw/AllNYSVoters_2017-12-27.csv")
+            | "AllNYSVoters_2017-03-27.csv" >> beam.io.ReadFromText(
+                    "gs://upload-raw/AllNYSVoters_2018-03-13.csv")
             | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
 
         elections = (p

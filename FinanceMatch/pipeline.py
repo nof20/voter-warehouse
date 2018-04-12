@@ -104,10 +104,9 @@ def enhance_voter(row):
             .replace('MANHATTAN', 'NEW YORK')\
             .replace('BRONX', 'NEW YORK') if 'TOWNCITY' in row else "",
         str(row['RZIP5']).strip() if 'RZIP5' in row else "")
-    row['match_string'] = "{}, {} {}\n{}".format(
-        str(row['LASTNAME']).strip(),
+    row['match_string'] = "{} {}, {}".format(
         str(row['FIRSTNAME']).strip(),
-        str(row['MIDDLENAME'])[0] if row['MIDDLENAME'] else "",
+        str(row['LASTNAME']).strip(),
         address).upper().replace("  ", " ").replace("APT APT", "APT").replace(".0", "")
     return row
 

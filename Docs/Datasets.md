@@ -84,4 +84,18 @@ At present this contains one table:
     - All State Senate seats
     - State Assembly Districts 9 and 75.
 
+## News
+
+The News dataset contains data from news feeds.
+
+* `News.Semantic` is a table of relevant news stories, taken from Google News,
+processed through a Natural Language Processing API.  This allows us to identify
+`entities` within each news article: subjects or individuals mentioned.  The salience
+(how central it is to the article), score, and magnitude (measures of positive or
+negative feeling) are estimated and recorded.  If the entity has a known Wikipedia
+URL, this is also recorded to help uniquely identify it.  Current subjects
+being monitored are 'Lee Zeldin', 'Jeff Klein', 'John Faso', 'Marisol Alcantara',
+'David Valesky', 'David Carlucci', 'Diane Savino', 'Tony Avella', and 'Jose Peralta'.
+
+
 Next: see [example queries](ExampleQueries.md).
