@@ -37,7 +37,7 @@ Query Language).  A simple query might be:
 ```
 #standardSQL
 SELECT FullName, Gender, DateOfBirth
-FROM Voter.Formatted
+FROM `voter-warehouse.Voter.Formatted`
 LIMIT 10;
 ```
 

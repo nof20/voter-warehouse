@@ -5,8 +5,9 @@
 Get data for a specific voter:
 
 ```
+#standardSQL
 SELECT FullName, Gender, Enrollment, DateOfBirth, FiveYearElections, FiveYearPrimaries
-FROM Voter.Formatted
+FROM `voter-warehouse.Voter.Formatted`
 WHERE FullName = "John Simonian"
 AND County = "Queens"
 ```
@@ -18,8 +19,9 @@ AND County = "Queens"
 Get summary of voters by enrollment (party) in a given district:
 
 ```
+#standardSQL
 SELECT Enrollment, COUNT(*) AS Num
-FROM Voter.Formatted
+FROM `voter-warehouse.Voter.Formatted`
 WHERE SenateDistrict = 31
 GROUP BY Enrollment
 ```
@@ -40,8 +42,9 @@ GROUP BY Enrollment
 Get summary of State Senate districts overlapping with AD 75, with voter count in each one:
 
 ```
+#standardSQL
 SELECT SD, COUNT(*) AS Num
-FROM Voter.Raw
+FROM `voter-warehouse.Voter.Raw`
 WHERE AD = 75
 AND STATUS = "ACTIVE"
 GROUP BY 1
@@ -56,9 +59,10 @@ GROUP BY 1
 How many voters in Brookhaven ED 1 voted in the 2016 Presidential Primary?
 
 ```
+#standardSQL
 SELECT r.ENROLLMENT, ec.Date, ec.Type, COUNT(*) AS Num
-FROM Voter.Raw r, UNNEST(SPLIT(r.VoterHistory, ';')) v
-JOIN Voter.ElectionCodes ec ON v = ec.Election
+FROM `voter-warehouse.Voter.Raw` r, UNNEST(SPLIT(r.VoterHistory, ';')) v
+JOIN `voter-warehouse.Voter.ElectionCodes` ec ON v = ec.Election
 WHERE r.TOWNCITY = "BROOKHAVEN"
 AND r.ED = 1
 AND ec.Date > "2016-01-01"
@@ -82,7 +86,7 @@ Get data for a specific district:
 SELECT CountyName, CousubName, TotalOver18, HispanicOver18,
   WhiteNonHispanicOver18, BlackNonHispanicOver18, TotalHousingUnits,
   OccupiedHousingUnits, VacantHousingUnits, e.AD, e.ED
-FROM Census.VTDFormatted v, UNNEST(v.ElectionDistricts) e
+FROM `voter-warehouse.Census.VTDFormatted` v, UNNEST(v.ElectionDistricts) e
 WHERE e.AD = 67
 ```
 
@@ -101,7 +105,7 @@ Get 2016 election vote totals for Suffolk County only, Congressional Districts 1
 ```
 #standardSQL
 SELECT office, district, candidate, ARRAY_TO_STRING(ARRAY_AGG(party), ", ") AS Parties, sum(votes) AS Votes
-FROM Results.Curated
+FROM `voter-warehouse.Results.Curated`
 WHERE county='Suffolk'
 AND election_date='2016-11-08'
 AND candidate NOT IN ('Blank', 'Scattering', 'Void', 'Total')
@@ -124,8 +128,9 @@ ORDER BY 1, 2, 3
 Generate a summary by year of fundraising for State Senate District 22:
 
 ```
+#standardSQL
 SELECT FilingYear, FilerID, FilerName, FORMAT("$%'.0f", SUM(Amt)) AS Raised
-FROM Finance.State
+FROM `voter-warehouse.Finance.State`
 WHERE FilingYear > 2016
 AND Office = "State Senator"
 AND Dist = 22
