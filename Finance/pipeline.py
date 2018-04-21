@@ -37,7 +37,11 @@ QUERIES = [
     ('Lt. Governor', ''),
     ('State Senator', '*'),
     ('Member of Assembly', '9'),
-    ('Member of Assembly', '75')
+    ('Member of Assembly', '75'),
+    ('District Leader', '75'),
+    ('District Leader', '67'),
+    ('City Council', '3'),
+    ('City Council', '6')
 ]
 
 NYS_BOE_OFFICE_CODES = {
@@ -235,6 +239,24 @@ class MultiGetFilers(beam.DoFn):
             for f in get_all_filers(office, d):
                 yield f
 
+def add_committees(row):
+    url = "http://www.elections.ny.gov:8080/plsql_browser/getfiler2_loaddates"
+    logging.info("Getting committees for Filer ID {}".format(row['Filer ID']))
+    data = {'filerid_in': row['Filer ID']}
+    resp = post(url, data=data)
+    resp.raise_for_status()
+    output = [row] # always emit original row
+    cttee_id = re.search('getfiler2_loaddates\?filerid_in=(.*)"', resp.text)
+    cttee_name = re.search('Authorized Committee = (.*)\n', resp.text)
+    if cttee_id or cttee_name:
+        new = row.copy()
+        new['Filer ID'] = cttee_id.group(1).strip()
+        new['Filer Name'] = "{} ({})".format(row['Filer Name'], cttee_name.group(1).strip())
+        output.append(new)
+
+    return output
+
+
 def get_reports(row):
     url = "http://www.elections.ny.gov:8080/plsql_browser/filer_contribution_details"
     logging.info("Getting reports for Filer ID {}, Name {}".format(row['Filer ID'], row['Filer Name']))
@@ -302,6 +324,7 @@ def run(argv=None):
         raw = (p
             | "beam.Create" >> beam.Create(QUERIES)
             | "MultiGetFilers" >> beam.ParDo(MultiGetFilers())
+            | "add_committees" >> beam.FlatMap(add_committees)
             | "get_reports" >> beam.FlatMap(get_reports)
             | "flatten_format" >> beam.Map(flatten_format)
             | "Finance.State" >> beam.io.WriteToBigQuery(
