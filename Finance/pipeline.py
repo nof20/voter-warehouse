@@ -248,7 +248,7 @@ def add_committees(row):
     output = [row] # always emit original row
     cttee_id = re.search('getfiler2_loaddates\?filerid_in=(.*)"', resp.text)
     cttee_name = re.search('Authorized Committee = (.*)\n', resp.text)
-    if cttee_id or cttee_name:
+    if cttee_id and cttee_name:
         new = row.copy()
         new['Filer ID'] = cttee_id.group(1).strip()
         new['Filer Name'] = "{} ({})".format(row['Filer Name'], cttee_name.group(1).strip())

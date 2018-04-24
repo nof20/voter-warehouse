@@ -29,8 +29,6 @@ SCHEMA_FIELDS = [
 FINANCE_QUERY = """
 SELECT FilingYear, FilerName, Contributor, SUM(Amt) AS TotalDonation
 FROM Finance.State
-WHERE Office = "State Senator"
-AND Dist = 31
 GROUP BY 1, 2, 3
 ORDER BY 1, 2, 3
 """
@@ -105,8 +103,8 @@ def enhance_voter(row):
             .replace('BRONX', 'NEW YORK') if 'TOWNCITY' in row else "",
         str(row['RZIP5']).strip() if 'RZIP5' in row else "")
     row['match_string'] = "{} {}, {}".format(
-        str(row['FIRSTNAME']).strip(),
         str(row['LASTNAME']).strip(),
+        str(row['FIRSTNAME']).strip(),
         address).upper().replace("  ", " ").replace("APT APT", "APT").replace(".0", "")
     return row
 

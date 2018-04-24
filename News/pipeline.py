@@ -214,7 +214,7 @@ def run(argv=None):
         '--staging_location gs://voterdb-test-dataflow-staging/',
         '--requirements_file=requirements.txt',
         '--max_num_workers=8',
-        '--disk_size_gb=100'])
+        '--disk_size_gb=50'])
 
     pipeline_options = PipelineOptions(pipeline_args)
     pipeline_options.view_as(SetupOptions).save_main_session = True
