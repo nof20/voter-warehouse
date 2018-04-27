@@ -8,6 +8,8 @@ import logging
 import re
 import sys
 import apache_beam as beam
+from pyusps import address_information
+
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from apache_beam.options.pipeline_options import PipelineOptions
@@ -16,21 +18,28 @@ from datetime import date, datetime
 from fuzzywuzzy.process import fuzz
 
 SCHEMA_FIELDS = [
-    ('COUNTYVRNUMBER', 'string', 'nullable'),
-    ('Contributor', 'string', 'nullable'),
-    ('FilerName', 'string', 'nullable'),
-    ('FilingYear', 'integer', 'nullable'),
     ('SBOEID', 'string', 'nullable'),
+    ('COUNTYVRNUMBER', 'string', 'nullable'),
+    ('FilingYear', 'integer', 'nullable'),
+    ('ContributorName', 'string', 'nullable'),
+    ('ContributorAddr1', 'string', 'nullable'),
+    ('ContributorAddr2', 'string', 'nullable'),
+    ('FilerID', 'string', 'nullable'),
+    ('FilerName', 'string', 'nullable'),
+    ('FilerCommittee', 'string', 'nullable'),
+    ('Office', 'string', 'nullable'),
     ('TotalDonation', 'float', 'nullable'),
-    ('match_string', 'string', 'nullable'),
+    ('voter_match_string', 'string', 'nullable'),
+    ('donor_match_string', 'string', 'nullable'),
     ('ratio', 'integer', 'nullable')
 ]
 
 FINANCE_QUERY = """
-SELECT FilingYear, FilerName, Contributor, SUM(Amt) AS TotalDonation
+SELECT FilingYear, ContributorName, ContributorAddr1, ContributorAddr2,
+    FilerID, FilerName, FilerCommittee, Office, SUM(Amt) AS TotalDonation
 FROM Finance.State
-GROUP BY 1, 2, 3
-ORDER BY 1, 2, 3
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+ORDER BY 1, 2, 3, 4, 5, 6, 7, 8
 """
 
 VOTER_QUERY = """
@@ -41,7 +50,8 @@ AND STATUS = "ACTIVE"
 """
 
 INITIAL_LENGTH = 8
-FUZZ_THRESHOLD = 88
+FUZZ_THRESHOLD = 70
+
 
 def gen_kind_schema(tup):
     kind_schema = bigquery.TableFieldSchema()
@@ -54,6 +64,7 @@ def gen_kind_schema(tup):
             kind_schema.fields.append(nest_schema)
     return kind_schema
 
+
 def gen_schema(fields):
     """See https://beam.apache.org/documentation/sdks/pydoc/0.6.0/_modules/apache_beam/examples/cookbook/bigquery_schema.html."""
 
@@ -63,6 +74,7 @@ def gen_schema(fields):
         table_schema.fields.append(kind_schema)
     return table_schema
 
+
 def flatten_format(row):
     # Map and type-convert
     logging.info("Starting flatten_format: {}".format(str(row)))
@@ -71,7 +83,8 @@ def flatten_format(row):
         if typ in ['string', 'timestamp', 'date']:
             if name in row:
                 try:
-                    output[name] = row[name].encode('utf-8', errors='ignore').strip()
+                    output[name] = row[name].encode(
+                        'utf-8', errors='ignore').strip()
                 except Exception:
                     output[name] = None
             else:
@@ -80,33 +93,22 @@ def flatten_format(row):
             try:
                 output[name] = int(str(row[name]).strip())
             except Exception as e:
-                logging.error("Caught exception casting to int: {}".format(str(e)))
+                logging.error(
+                    "Caught exception casting to int: {}".format(
+                        str(e)))
                 output[name] = None
         elif typ == 'float':
             try:
                 output[name] = float(str(row[name]).strip())
             except Exception as e:
-                logging.error("Caught exception casting to float: {}".format(str(e)))
+                logging.error(
+                    "Caught exception casting to float: {}".format(
+                        str(e)))
                 output[name] = None
 
     logging.info("Returning: {}".format(str(output)))
     return output
 
-def enhance_voter(row):
-    address = "{} {} {}\n{}, NY {}".format(
-        str(row['RADDNUMBER']).strip() if 'RADDNUMBER' in row else "",
-        str(row['RSTREETNAME']).strip() if "RSTREETNAME" in row else "",
-        "APT {}".format(
-            str(row['RAPARTMENT']).strip()) if 'RAPARTMENT' in row else "",
-        str(row['TOWNCITY']).strip()\
-            .replace('MANHATTAN', 'NEW YORK')\
-            .replace('BRONX', 'NEW YORK') if 'TOWNCITY' in row else "",
-        str(row['RZIP5']).strip() if 'RZIP5' in row else "")
-    row['match_string'] = "{} {}, {}".format(
-        str(row['LASTNAME']).strip(),
-        str(row['FIRSTNAME']).strip(),
-        address).upper().replace("  ", " ").replace("APT APT", "APT").replace(".0", "")
-    return row
 
 class CachingFuzzer(object):
 
@@ -118,15 +120,21 @@ class CachingFuzzer(object):
             self.cache[b] = fuzz.ratio(self.a, b)
         return self.cache[b]
 
+
 def get_voter(donor, dictlist):
     """Add voter data to donor data, if there's a match."""
 
     length = INITIAL_LENGTH
-    c = CachingFuzzer(donor['Contributor'])
+    donor_match_string = "{}, {}, {}".format(
+        donor['ContributorName'],
+        donor['ContributorAddr1'],
+        donor['ContributorAddr2']
+    )
+    c = CachingFuzzer(donor_match_string)
     match = False
     while not match:
-        universe = filter(lambda x: x['match_string'][:length] == donor['Contributor'][:length],\
-                          dictlist)
+        universe = filter(
+            lambda x: x['match_string'][:length] == donor_match_string[:length], dictlist)
         if len(universe):
             filtered_universe = []
             for u in universe:
@@ -134,15 +142,23 @@ def get_voter(donor, dictlist):
                 if u['ratio'] >= FUZZ_THRESHOLD:
                     filtered_universe.append(u)
             if filtered_universe:
-                sorted_universe = sorted(filtered_universe, key=lambda x: x['ratio'], reverse=True)
+                sorted_universe = sorted(
+                    filtered_universe,
+                    key=lambda x: x['ratio'],
+                    reverse=True)
                 top_all = sorted_universe[0]
-                top = {k: top_all[k] for k in ['match_string', 'ratio', 'SBOEID', 'COUNTYVRNUMBER']}
-                logging.info("Match: {} matches {}".format(donor['Contributor'], top))
+                top = {k: top_all[k]
+                       for k in ['ratio', 'SBOEID', 'COUNTYVRNUMBER']}
+                logging.info(
+                    u"Match: {} matches {}".format(
+                        donor_match_string, top))
                 match = True
                 dct = dict(donor).copy()
-                logging.info("Adding data to donor: {}".format(str(donor)))
+                logging.info(u"Adding data to donor: {}".format(str(donor)))
                 dct.update(top)
-                logging.info("About to save: {}".format(str(dct)))
+                dct['voter_match_string'] = top['match_string']
+                dct['donor_match_string'] = donor_match_string
+                logging.info(u"About to save: {}".format(str(dct)))
                 return dct
         if length > 1:
             length -= 1
@@ -151,18 +167,86 @@ def get_voter(donor, dictlist):
             match = True
             return donor
 
+
+def standardize_address(batch, usps_key):
+    # Form voter addresses
+    post_data = []
+    for row in batch:
+        try:
+            raddnumber = row['RADDNUMBER'].strip() if row['RADDNUMBER'] else ""
+            rstreetname = row['RSTREETNAME'].strip(
+            ) if row['RSTREETNAME'] else ""
+            if row['RAPARTMENT']:
+                if ('APT' in row['RAPARTMENT']) or (
+                        'UNIT' in row['RAPARTMENT']) or ('PH' in row['RAPARTMENT']):
+                    rapartment = row['RAPARTMENT']
+                else:
+                    rapartment = "APT {}".format(row['RAPARTMENT'])
+            else:
+                rapartment = ""
+            post_data.append({
+                'address': " ".join([raddnumber, rstreetname, rapartment]),
+                'city': row['RCITY'],
+                'state': 'NY'
+            })
+        except Exception as e:
+            logging.Info(
+                "Could not form address in standardize_address, error: {}".format(e))
+            post_data.append(None)
+
+    # Submit batch to API
+    recv_data = address_information.verify(usps_key, *post_data)
+
+    # Match
+    output = []
+    for i, row in enumerate(batch):
+        out_dct = row.copy()
+        # Try and use formatted address
+        try:
+            out_dct['voter_addr1'] = recv_data[i]['address']
+            if isinstance(recv_data[i]['zip5'], int):
+                # So defensive
+                recv_data[i]['zip5'] = "{:0.0f}".format(recv_data[i]['zip5'])
+            out_dct['voter_addr2'] = "{}, {} {}".format(
+                recv_data[i]['city'], recv_data[i]['state'], recv_data[i]['zip5'])
+        except Exception as e:
+            # Output from pyusps is Exception not dict, etc.; fall back on
+            # constructed string
+            try:
+                out_dct['voter_addr1'] = post_data[i]['address']
+            except Exception as e:
+                # e.g. because post_data[i] is None
+                out_dct['voter_addr1'] = None
+            out_dct['voter_addr2'] = "{}, NY {}".format(
+                row['RCITY'], row['RZIP5'])
+
+        # Form match string, whatever happens
+        out_dct['match_string'] = "{} {}, {}, {}".format(
+            out_dct['LASTNAME'].strip(),
+            out_dct['FIRSTNAME'].strip(),
+            out_dct['voter_addr1'],
+            out_dct['voter_addr2']
+        )
+        output.append(out_dct)
+    return output
+
+
 def run(argv=None):
     """Main entry point; defines and runs the pipeline."""
     logging.info("Starting pipeline.")
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--usps_key',
+                        dest='usps_key',
+                        default=None,
+                        help='USPS API key')
     known_args, pipeline_args = parser.parse_known_args(argv)
     pipeline_args.extend([
         '--project=voterdb-test',
         '--job_name=financematch-pipeline',
         '--temp_location gs://voterdb-test-dataflow-temp/',
         '--staging_location gs://voterdb-test-dataflow-staging/',
-        '--max_num_workers=8',
+        '--max_num_workers=32',
         '--disk_size_gb=50'])
 
     pipeline_options = PipelineOptions(pipeline_args)
@@ -172,19 +256,20 @@ def run(argv=None):
         voter = (p
             | "VOTER_QUERY" >> beam.io.Read(
                 beam.io.BigQuerySource(query=VOTER_QUERY))
-            | "enhance_voter" >> beam.Map(enhance_voter))
+            | "BatchElements" >> beam.BatchElements(max_batch_size=5)
+            | "standardize_address" >> beam.FlatMap(standardize_address,known_args.usps_key))
 
         out = (p
             | "FINANCE_QUERY" >> beam.io.Read(
-                beam.io.BigQuerySource(query=FINANCE_QUERY))
-            | "get_voter" >> beam.Map(get_voter,
-                beam.pvalue.AsList(voter))
+                   beam.io.BigQuerySource(query=FINANCE_QUERY))
+            | "get_voter" >> beam.Map(get_voter, beam.pvalue.AsList(voter))
             | "flatten_format" >> beam.Map(flatten_format)
             | "Finance.Match" >> beam.io.WriteToBigQuery(
-                table='Finance.Match',
-                schema=gen_schema(SCHEMA_FIELDS),
-                write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
-                create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
+                   table='Finance.Match',
+                   schema=gen_schema(SCHEMA_FIELDS),
+                   write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+                   create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
+
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
