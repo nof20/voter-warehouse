@@ -333,18 +333,22 @@ def get_reports(row):
 
 
 def split_address(row):
+    newdct = row.copy()
     vars = row['Contributor'].strip().split('\n')
     if len(vars) == 3:
-        row['ContributorName'] = vars[0]
-        row['ContributorAddr1'] = vars[1]
-        row['ContributorAddr2'] = vars[2]
+        newdct['ContributorName'] = vars[0]
+        newdct['ContributorAddr1'] = vars[1]
+        newdct['ContributorAddr2'] = vars[2]
     else:
-        row['ContributorName'] = row['Contributor']
-        row['ContributorAddr1'], row['ContributorAddr2'] = None, None
+        newdct['ContributorName'] = row['Contributor']
+        newdct['ContributorAddr1'], row['ContributorAddr2'] = None, None
+
+    return newdct
 
 
 def address_lookup(batch, usps_key):
     # Form donor addresses
+    logging.info("address_lookup processing batch: {}".format(str(batch)))
     post_data = []
     if batch is None:
         return []
@@ -367,12 +371,16 @@ def address_lookup(batch, usps_key):
     # Submit batch to API
     try:
         recv_data = address_information.verify(usps_key, *post_data)
-    except Exception:
+    except Exception as e:
+        # There was only one entry in the batch, and it failed
         logging.error("Caught exception posting to address_information.verify: {}".format(e))
     # Match
     output = []
     for i, row in enumerate(batch):
-        out_dct = row.copy()
+        if row is not None:
+            out_dct = row.copy()
+        else:
+            continue
         # Try and use formatted address
         try:
             out_dct['ContributorAddr1'] = recv_data[i]['address']
