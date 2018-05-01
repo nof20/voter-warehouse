@@ -120,21 +120,30 @@ class CachingFuzzer(object):
             self.cache[b] = fuzz.ratio(self.a, b)
         return self.cache[b]
 
+def filter_universe(x, match_string, length):
+    if x is not None:
+        if 'match_string' in x:
+            if x['match_string'][:length] == match_string[:length]:
+                return True
+
+    return False
 
 def get_voter(donor, dictlist):
     """Add voter data to donor data, if there's a match."""
 
     length = INITIAL_LENGTH
-    donor_match_string = "{}, {}, {}".format(
+    donor_match_string = u"{}, {}, {}".format(
         donor['ContributorName'],
         donor['ContributorAddr1'],
         donor['ContributorAddr2']
     )
+    logging.info(u"Starting get_voter for donor {}, donor_match_string {}".format(str(donor), donor_match_string))
+
     c = CachingFuzzer(donor_match_string)
     match = False
     while not match:
         universe = filter(
-            lambda x: x['match_string'][:length] == donor_match_string[:length], dictlist)
+            lambda x: filter_universe(x, donor_match_string, length), dictlist)
         if len(universe):
             filtered_universe = []
             for u in universe:
@@ -148,7 +157,7 @@ def get_voter(donor, dictlist):
                     reverse=True)
                 top_all = sorted_universe[0]
                 top = {k: top_all[k]
-                       for k in ['ratio', 'SBOEID', 'COUNTYVRNUMBER']}
+                       for k in ['ratio', 'SBOEID', 'COUNTYVRNUMBER', 'match_string']}
                 logging.info(
                     u"Match: {} matches {}".format(
                         donor_match_string, top))
@@ -171,6 +180,9 @@ def get_voter(donor, dictlist):
 def standardize_address(batch, usps_key):
     # Form voter addresses
     post_data = []
+    if batch is None:
+        return []
+
     for row in batch:
         try:
             raddnumber = row['RADDNUMBER'].strip() if row['RADDNUMBER'] else ""
@@ -185,7 +197,7 @@ def standardize_address(batch, usps_key):
             else:
                 rapartment = ""
             post_data.append({
-                'address': " ".join([raddnumber, rstreetname, rapartment]),
+                'address': u" ".join([raddnumber, rstreetname, rapartment]),
                 'city': row['RCITY'],
                 'state': 'NY'
             })
@@ -195,12 +207,19 @@ def standardize_address(batch, usps_key):
             post_data.append(None)
 
     # Submit batch to API
-    recv_data = address_information.verify(usps_key, *post_data)
+    try:
+        recv_data = address_information.verify(usps_key, *post_data)
+    except Exception as e:
+        logging.error("Caught exception posting to standardize_address: {}".format(e))
 
     # Match
     output = []
     for i, row in enumerate(batch):
-        out_dct = row.copy()
+        if row is not None:
+            out_dct = row.copy()
+        else:
+            continue
+
         # Try and use formatted address
         try:
             out_dct['voter_addr1'] = recv_data[i]['address']
