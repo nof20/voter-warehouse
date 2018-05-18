@@ -43,7 +43,7 @@ SCHEMA_FIELDS = [
 
 KEYWORDS = ['Lee Zeldin', 'Jeff Klein', 'John Faso', 'Marisol Alcantara',
     'David Valesky', 'David Carlucci', 'Diane Savino', 'Tony Avella',
-    'Jose Peralta']
+    'Jose Peralta', 'Jesse Hamilton']
 
 def gen_kind_schema(tup):
     kind_schema = bigquery.TableFieldSchema()
