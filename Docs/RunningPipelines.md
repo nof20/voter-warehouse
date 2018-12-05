@@ -1,6 +1,11 @@
-# Census
+# Running the pipelines
 
-Data from the 2010 US Redistricting Census.
+Initial implementation of the pipelines had one file per module.  I'm now in
+the process of abstracting shared code.
+
+## Census
+
+Data from the 2010 US Redistricting Census.  This module uses the new format.
 
 Download input data from the Census website:
 ```
@@ -12,22 +17,13 @@ gsutil cp *.pl gs://upload-raw/census/
 Load the SummaryLevels metadata:
 
 ```
-bq load Census.SummaryLevels SummaryLevels.data.csv SummaryLevels.schema.json
+bq load Census.SummaryLevels Data/SummaryLevels.data.csv Data/SummaryLevels.schema.json
 ```
 
-## Pipeline
-
-![Pipeline image](pipeline.png)
-
-To run the pipeline:
+Run the pipeline:
 
 ```
-python pipeline.py \
-  --runner=DataflowRunner \
-  --temp_location=gs://<temp bucket> \
-  --staging_location=gs://<staging bucket> \
-  --max_num_workers=1 \
-  --disk_size_gb=100
+python pipeline.py --module=census --runner=DataflowRunner
 ```
 
 At present the pipeline relies on the files being present in GCS bucket

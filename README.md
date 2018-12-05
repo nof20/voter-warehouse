@@ -21,6 +21,8 @@ Datasets:
 
 To get started as a user, see [Getting Started](Docs/GettingStarted.md).
 
+To run the pipelines yourself, see [Running the Pipelines](Docs/RunningPipelines.md).
+
 To contribute to this project, see [Contributing](Docs/Contributing.md).
 
 ## Legal Stuff

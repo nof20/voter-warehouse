@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package fuzzer;
+
+service Echo {
+    rpc Echo(Address) returns (Address) {}
+}
+
+message Address {
+    string line1 = 1;
+    string city = 2;
+    string state = 3;
+    int32 zip5 = 4;
+    int32 zip4 = 5;
+}

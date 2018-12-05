@@ -1,4 +1,4 @@
-"""Scrape and analyze news sentiment data.
+"""Scrape and analyze Legislation data.
 
 """
 
@@ -14,10 +14,6 @@ import xml.etree.ElementTree as ET
 
 from collections import deque
 from datetime import date, datetime
-from urllib import quote
-from google.cloud import language
-from google.cloud.language import enums
-from google.cloud.language import types
 from requests import get
 from bs4 import BeautifulSoup, Comment
 from apache_beam.io.gcp.internal.clients import bigquery
@@ -40,10 +36,6 @@ SCHEMA_FIELDS = [
         ('wikipedia_url', 'string', 'nullable'))
     )
 ]
-
-KEYWORDS = ['Lee Zeldin', 'Jeff Klein', 'John Faso', 'Marisol Alcantara',
-    'David Valesky', 'David Carlucci', 'Diane Savino', 'Tony Avella',
-    'Jose Peralta']
 
 def gen_kind_schema(tup):
     kind_schema = bigquery.TableFieldSchema()
@@ -85,109 +77,40 @@ def flatten_format(row):
 
     return output
 
-def tag_visible(element):
-    if element.parent.name in ['style', 'script', 'head', 'title', 'meta', '[document]']:
-        return False
-    if isinstance(element, Comment):
-        return False
-    return True
+def get_bills_year(year, key):
+    offset = 1
+    more = True
+    total = None
+    bills = []
+    logging.info("Getting bills for {}".format(year))
+    while more:
+        payload = {
+            'key': key,
+            'view': 'info',
+            'limit': 100,
+            'offset': offset}
+        r = get(
+            'http://legislation.nysenate.gov/api/3/bills/' +
+            year,
+            params=payload)
+        r.raise_for_status()
+        total = r.json()['total']
+        for bill in r.json()['result']['items']:
+            bills.append(bill)
+        offset += r.json()['result']['size']
+        more = False if offset >= total else True
+        print(".", end="")
+    return bills
 
-def text_from_html(body):
-    soup = BeautifulSoup(body)
-    texts = soup.findAll(text=True)
-    visible_texts = filter(tag_visible, texts)
-    return u" ".join(t.strip() for t in visible_texts)
+def get_bill_detail(year, printNo, key):
+    payload = {'key': key, 'view': 'default'}
+    r = get("http://legislation.nysenate.gov/api/3/bills/{}/{}".format(year,
+                                                                           printNo), params=payload)
+    r.raise_for_status()
+    doc = r.json()['result']
+    doc['year'] = year
+    return doc
 
-
-def get_news_items(row):
-    quoted = quote(row)
-    url = 'https://news.google.com/news/rss/search/section/q/{}/{}'.format(quoted, quoted)
-    params = {'ned': 'us', 'gl': 'US', 'hl': 'en'}
-    resp = get(url, params=params, headers={'User-Agent': USER_AGENT})
-    resp.raise_for_status()
-    tree = ET.fromstring(resp.text.encode('ascii', errors='replace'))
-    items = tree.find('channel').findall('item')
-    output = []
-    for item in items:
-        dct = {item[i].tag: item[i].text for i in range(len(item))}
-        text = None
-        logging.info("Found keyword '{}' in URL '{}'".format(row, dct['link']))
-        try:
-            rr = get(url, headers={'User-Agent': USER_AGENT})
-            rr.raise_for_status()
-            soup = BeautifulSoup(rr.text)
-            text = text_from_html(rr.text)
-            if isinstance(text, str):
-                text = unicode(text, errors='replace')
-            if isinstance(dct['title'], str):
-                dct['title'] = unicode(dct['title'], errors='replace')
-            if isinstance(dct['link'], str):
-                dct['link'] = unicode(dct['link'], errors='replace')
-        except Exception as err:
-            logging.error('Failed getting keyword "{}" in URL {}: {}'.format(row, url, str(err)))
-
-        output.append({'keyword': row,
-            'title': dct['title'],
-            'url': dct['link'],
-            'pubdate': dct['pubDate'],
-            'text': text})
-    if len(items) == 0:
-        logging.error("Zero items in Google News feed, something went wrong")
-    return output
-
-class BatchRunner(beam.DoFn):
-
-    def process(self, batch, fn):
-        threads = deque()
-        results = []
-        for row in batch:
-            if len(threads) > 30:
-                t = threads.popleft()
-                t.join()
-
-            t = threading.Thread(target=fn,
-                    args=(row, results))
-            t.start()
-            threads.append(t)
-
-        while threads:
-            t = threads.popleft()
-            t.join()
-
-        for r in results:
-            yield r
-
-def analyze(row, results):
-    if row['text']:
-        logging.info("Analyzing URL {}".format(row['url']))
-        # See https://developers.google.com/api-client-library/python/guide/thread_safety.
-        client = language.LanguageServiceClient()
-        document = types.Document(
-            content=row['text'],
-            type=enums.Document.Type.PLAIN_TEXT)
-        if sys.maxunicode == 65535:
-            encoding = enums.EncodingType.UTF16
-        else:
-            encoding = enums.EncodingType.UTF32
-        try:
-            result = client.analyze_entity_sentiment(document, encoding)
-            output = []
-            for entity in result.entities:
-                if entity.salience > 0.001:
-                    if 'wikipedia_url' in entity.metadata:
-                        wikipedia_url = entity.metadata['wikipedia_url']
-                    else:
-                        wikipedia_url = None
-                    output.append({'name': entity.name,
-                                   'salience': entity.salience,
-                                   'score': entity.sentiment.score,
-                                   'magnitude': entity.sentiment.magnitude,
-                                   'wikipedia_url': wikipedia_url})
-            row['entities'] = output
-            results.append(row)
-            return
-        except Exception as err:
-            logging.error('Exception in analysis: {}'.format(err))
 
 
 def format_bq(row):
