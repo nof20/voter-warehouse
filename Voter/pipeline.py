@@ -3,7 +3,7 @@
 TODO:
 - Move GCS input file to command-line
 - Pick local/remote mode easier
-- Split VoterHistory, although unfortunatley this requires more involved schema definitions:
+- Split VoterHistory, although unfortunately this requires more involved schema definitions:
     https://reformatcode.com/code/python/json-table-schema-to-bigquerytableschema-for-bigquerysink
 
 USPS address validation is presently disabled in the code below.
@@ -16,6 +16,7 @@ import argparse
 import logging
 import csv
 import threading
+import logging
 
 #from pyusps import address_information
 from datetime import date, datetime
@@ -64,10 +65,10 @@ class DictFromRawLine(beam.DoFn):
                     name, typ = field.split(":")
                     try:
                         if typ == "STRING":
-                            dct[name] = data[i].encode('utf-8').strip()
+                            dct[name] = data[i].strip()
                         elif typ == "INTEGER":
                             try:
-                                dct[name] = int(data[i].encode('utf-8').strip())
+                                dct[name] = int(data[i].strip())
                             except ValueError:
                                 logging.debug("Could not parse int in field {}".format(name))
                                 dct[name] = None
@@ -148,7 +149,7 @@ def build_formatted(element, elections, counties):
     """Generate row in formatted table."""
 
     # Ignore inactive
-    if element['STATUS'] != 'ACTIVE':
+    if str(element['STATUS']) != 'ACTIVE':
         return []
 
     # Copy retained fields
@@ -224,7 +225,6 @@ def build_formatted(element, elections, counties):
     else:
         new['County'] = None
 
-    logging.debug("Returning: {}".format(new))
     return [new]
 
 
@@ -279,8 +279,8 @@ def run(argv=None):
 
        # TODO: Select rather than hard-code bucket/file name
         raw = (p
-            | "AllNYSVoters_2017-03-27.csv" >> beam.io.ReadFromText(
-                    "gs://upload-raw/AllNYSVoters_2018-03-13.csv")
+            | "Load source" >> beam.io.ReadFromText(
+                    "gs://upload-raw/AllNYSVoters_2020-04-16.csv")
             | "DictFromRawLine" >> beam.ParDo(DictFromRawLine()))
 
         elections = (p
@@ -315,16 +315,14 @@ def run(argv=None):
                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
 
         output = (raw
-                  # | "BatchElements" >> beam.BatchElements()
-                  # | "BatchRunner" >> beam.ParDo(BatchRunner(), known_args.usps_key)
-                  | "build_formatted" >> beam.FlatMap(build_formatted,
-                        beam.pvalue.AsDict(elections),
-                        beam.pvalue.AsDict(counties))
-                  | "Voter.Formatted" >> beam.io.WriteToBigQuery(
-                      table='Voter.Formatted',
-                      schema=FORMATTED_SCHEMA,
-                      write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
-                      create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
+            | "build_formatted" >> beam.FlatMap(build_formatted,
+                beam.pvalue.AsDict(elections),
+                beam.pvalue.AsDict(counties))
+            | "Voter.Formatted" >> beam.io.WriteToBigQuery(
+                table='Voter.Formatted',
+                schema=FORMATTED_SCHEMA,
+                write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+                create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED))
 
 
 if __name__ == '__main__':
